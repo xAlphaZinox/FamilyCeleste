@@ -1,0 +1,2263 @@
+ <!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<title>FamilyCeleste – Gestión Familiar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<!-- ===== Librerías ===== -->
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- jsPDF -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<!-- SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+<style>
+/* =========================================================
+   THEME TOKENS + DARK MODE
+   ========================================================= */
+:root {
+  --primary: #2F6FD6;
+  --primary-2: #1e50a8;
+  --secondary: #A7C7E7;
+  --background: #F5F8FC;
+  --card: #FFFFFF;
+  --text: #1F2A44;
+  --muted: #6B7280;
+  --border: #E5E7EB;
+
+  /* Agenda color tokens */
+  --c-alimen: #10B981;  /* 🍽️ */
+  --c-med:    #EF4444;  /* 💊 */
+  --c-sue:    #6366F1;  /* 😴 */
+  --c-ter:    #F59E0B;  /* 🧩 */
+  --c-rec:    #0EA5E9;  /* ⚽  */
+
+  /* States */
+  --ok-bg:#ECFDF5; --ok-b:#A7F3D0; --ok-f:#065F46;
+  --warn-bg:#FFF7ED; --warn-b:#FED7AA; --warn-f:#7C2D12;
+  --err-bg:#FEF2F2; --err-b:#FECACA; --err-f:#991B1B;
+
+  /* Accent ribbons */
+  --ribbon:#f43f5e;
+  --ribbon-2:#f97316;
+}
+html[data-theme="dark"] {
+  --background:#0B1220; --card:#111827; --text:#F3F4F6; --muted:#9CA3AF; --border:#1F2937; --primary:#6EA8FE; --primary-2:#4f86d6;
+  --ok-bg:#022c22; --ok-b:#065f46; --ok-f:#a7f3d0; --warn-bg:#331b07; --warn-b:#7c2d12; --warn-f:#fed7aa; --err-bg:#2b0d0d; --err-b:#7f1d1d; --err-f:#fecaca;
+  --ribbon:#fb7185; --ribbon-2:#fb923c;
+}
+
+* { box-sizing:border-box; font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif }
+
+/* ===== Fondo moderno con gradiente + patrón sutil ===== */
+body {
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 800px at 80% -10%, rgba(99,102,241,0.14), transparent 60%),
+    radial-gradient(900px 600px at -10% 10%, rgba(14,165,233,0.12), transparent 55%),
+    linear-gradient(180deg, var(--background), color-mix(in oklab, var(--background), #000 4%));
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: .08;
+  pointer-events: none;
+}
+
+header {
+  padding:12px 16px;
+  background: color-mix(in oklab, var(--card), transparent 10%);
+  border-bottom:1px solid color-mix(in oklab, var(--border), transparent 40%);
+  backdrop-filter: saturate(120%) blur(10px);
+  -webkit-backdrop-filter: saturate(120%) blur(10px);
+  display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; z-index:10;
+}
+header .left { display:flex; align-items:center; gap:10px; font-weight:700; color:var(--primary) }
+header .right { display:flex; gap:8px; align-items:center }
+header .theme-toggle { width:auto; background:transparent; color:var(--text); border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer }
+
+.container { padding:18px; max-width:980px; margin:auto }
+
+/* Cards “glassmorphism” */
+.card {
+  background: color-mix(in oklab, var(--card), transparent 12%);
+  border-radius:18px; padding:18px; margin-bottom:18px;
+  border:1px solid color-mix(in oklab, var(--border), transparent 30%);
+  box-shadow: 0 8px 30px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+h2 { margin:0 0 12px; font-size:18px }
+h3 { margin:10px 0 8px; font-size:16px }
+label { font-size:14px; color:var(--muted) }
+
+input, select, button, textarea {
+  width:100%; padding:12px; border-radius:12px; border:1px solid var(--border);
+  margin-top:6px; font-size:15px; background:transparent; color:var(--text);
+}
+textarea { resize:vertical; min-height:70px }
+
+button {
+  background:var(--primary); color:#fff; font-weight:600; border:none; margin-top:12px; cursor:pointer;
+  transition: transform .05s ease, box-shadow .15s ease, background-color .2s ease, border-color .2s ease;
+}
+button:hover { background:var(--primary-2); transform: translateY(-1px); }
+.btn-outline { background:transparent; color:var(--text); border:1.5px solid var(--primary) }
+.btn-ghost { background:transparent; color:var(--primary); border:1px solid var(--border) }
+.btn-outline:hover { border-color: color-mix(in oklab, var(--primary), #fff 15%); box-shadow: 0 6px 18px rgba(99,102,241,.12); }
+
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px }
+.row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+
+.table { width:100%; border-collapse:collapse; margin-top:10px }
+.table th, .table td { font-size:14px; padding:8px; border-bottom:1px solid var(--border) }
+.table th { color:var(--muted); text-align:left }
+
+.hero {
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--card) 85%, transparent), transparent),
+    radial-gradient(800px 320px at 20% -10%, rgba(99,102,241,.18), transparent 70%),
+    radial-gradient(800px 280px at 90% 0%, rgba(14,165,233,.18), transparent 65%);
+  border:1px dashed color-mix(in oklab, var(--border), transparent 20%);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary), transparent 80%) inset;
+}
+.badge { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#EEF2FF22; color:var(--primary); font-size:12px; font-weight:600; border:1px dashed var(--primary) }
+
+.quick-cats { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:6px }
+.quick-cat { background:#F7FAFF22; border:1px dashed var(--border); border-radius:14px; padding:10px 6px; text-align:center; cursor:pointer; transition:transform .08s ease }
+.quick-cat:hover { transform:translateY(-1px) }
+.quick-cat .emoji { font-size:20px; display:block; margin-bottom:6px }
+
+.summary { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+.kpi { border:1px dashed var(--border); background:#FBFDFF11; padding:12px; border-radius:12px }
+.kpi .value { font-size:20px; font-weight:700 }
+
+.progress { width:100%; height:10px; background:#E5E7EB33; border-radius:999px; overflow:hidden }
+.progress>span { display:block; height:100%; background:linear-gradient(90deg,var(--primary),#6FA8DC); width:0% }
+
+.calendar { margin-top:12px; border:1px dashed var(--border); border-radius:14px; overflow:hidden }
+.cal-head { display:grid; grid-template-columns:repeat(7,1fr); background:#F8FAFC11; color:#A1A1AA; font-size:12px }
+.cal-head div, .cal-grid button { padding:10px; text-align:center }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr) }
+.cal-grid button { background:transparent; border:0; border-right:1px solid var(--border); border-bottom:1px solid var(--border); min-height:56px; position:relative; cursor:pointer }
+.cal-grid button:hover { background:#F8FAFF11 }
+.cal-daynum { position:absolute; top:6px; left:6px; font-size:12px; color:#9CA3AF }
+.day-badges { position:absolute; top:22px; left:0; right:0; display:flex; gap:4px; justify-content:center; font-size:12px }
+
+.tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.tile { background:#F7FAFF11; border:1px dashed var(--border); padding:12px; border-radius:14px }
+
+.upload { border:1.5px dashed var(--border); background:#F8FBFF08; text-align:center }
+.upload input[type="file"] { display:none }
+.upload .upload-btn { display:inline-block; padding:10px 12px; border-radius:10px; border:1px solid var(--border); color:var(--primary); background:transparent; cursor:pointer }
+.preview { margin-top:10px; display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:10px }
+.preview .thumb { position:relative }
+.preview img { width:100%; aspect-ratio:1/1; border-radius:10px; object-fit:cover; border:1px solid var(--border) }
+
+.toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); padding:10px 14px; border-radius:10px; background:#111827; color:#fff; z-index:2000; opacity:0; transition:opacity .2s ease }
+
+.ribbon { position:absolute; top:10px; left:-6px; background:var(--ribbon); color:#fff; padding:4px 10px; font-size:11px; font-weight:700; transform:skew(-8deg); border-radius:4px; box-shadow:0 10px 18px rgba(0,0,0,.18) }
+.ribbon.orange { background: var(--ribbon-2) }
+
+.ok { background:var(--ok-bg); border:1px solid var(--ok-b); color:var(--ok-f); padding:10px; border-radius:10px; font-size:13px }
+.warn { background:var(--warn-bg); border:1px solid var(--warn-b); color:var(--warn-f); padding:10px; border-radius:10px; font-size:13px }
+.err { background:var(--err-bg); border:1px solid var(--err-b); color:var(--err-f); padding:10px; border-radius:10px; font-size:13px }
+
+.tag { display:inline-flex; gap:6px; align-items:center; padding:6px 10px; border-radius:999px; background:#F3F4F611; border:1px dashed var(--border); font-size:12px }
+.msg { border:1px dashed var(--border); border-radius:10px; padding:8px; margin-bottom:6px; background:transparent }
+.msg .meta { font-size:11px; color:#9CA3AF }
+
+/* ===== Cupones: tarjeta con “perforado” y banda lateral ===== */
+.coupon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.coupon {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--card), transparent 12%);
+  border: 1px dashed color-mix(in oklab, var(--border), transparent 25%);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+.coupon-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 12px 0 12px;
+}
+.coupon-badge {
+  background: color-mix(in oklab, var(--primary), #fff 85%);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid color-mix(in oklab, var(--primary), transparent 40%);
+}
+.coupon-body { padding: 10px 12px 12px 12px; }
+.coupon-title { font-weight: 800; font-size: 16px; line-height: 1.25; }
+.coupon-partner, .coupon-meta, .coupon-terms { font-size: 12px; color: var(--muted); }
+.coupon-meta { margin-top: 6px; }
+.coupon-terms { margin-top: 4px; }
+.coupon-footer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border-top: 1px dashed color-mix(in oklab, var(--border), transparent 30%);
+}
+/* Banda lateral con “perforado” */
+.coupon::before,
+.coupon::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background:
+    radial-gradient(circle at 50% 8px, transparent 6px, currentColor 7px) top / 10px 16px repeat-y,
+    radial-gradient(circle at 50% 0px, transparent 6px, currentColor 7px) bottom / 10px 16px repeat-y;
+  color: color-mix(in oklab, var(--border), transparent 15%);
+  opacity: .65;
+}
+.coupon::before { left: -5px; }
+.coupon::after  { right: -5px; }
+/* Banner promo */
+.coupon .ribbon {
+  top: 8px;
+  left: 8px;
+  border-radius: 6px;
+  padding: 4px 8px;
+  transform: none;
+  box-shadow: 0 10px 18px rgba(0,0,0,.18);
+  font-size: 11px;
+}
+/* Código / pseudo-barcode visual */
+.coupon-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: #0b1220;
+  color: #f3f4f6;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #0f172a;
+}
+.coupon-hint { font-size: 11px; color: var(--muted); text-align: right; }
+/* Estados */
+.coupon.expired { filter: grayscale(.6); opacity: .7; }
+.coupon .label-pts {
+  background: #0ea5e922;
+  border: 1px dashed color-mix(in oklab, #0ea5e9, transparent 60%);
+  color: #0ea5e9;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.coupon .cat-pill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  font-size: 11px;
+}
+</style>
+
+<style id="fc-buttons-digital">
+  /* Botones digitales, familiares y profesionales */
+  :root{ --btn-radius:14px; --btn-pad:11px 16px; --btn-glow: 0 18px 36px rgba(29,127,216,.45); }
+  button,.btn{
+    position:relative; display:inline-flex; align-items:center; gap:8px;
+    padding:var(--btn-pad); border:0; border-radius:var(--btn-radius);
+    color:#fff; font-weight:800; letter-spacing:.2px; cursor:pointer; overflow:hidden;
+    background:linear-gradient(180deg, var(--fc-accent), var(--fc-accent-2));
+    box-shadow:var(--btn-glow); transition:transform .15s ease-out, box-shadow .2s ease;
+  }
+  button:before,.btn:before{ /* brillo diagonal suave */
+    content:""; position:absolute; inset:-60%; background:radial-gradient(120px 120px at 0% 0%, rgba(255,255,255,.35), transparent 60%);
+    transform:rotate(25deg); pointer-events:none; mix-blend-mode:soft-light; opacity:.35;
+  }
+  button:hover,.btn:hover{ transform:translateY(-1px); box-shadow:0 26px 48px rgba(29,127,216,.58) }
+  button:active,.btn:active{ transform:translateY(0) }
+  /* Variantes */
+  .btn.secondary, button.secondary{ background:linear-gradient(180deg,#2c3f66,#1b2a4b); color:#e6f0ff }
+  .btn.ghost{ background:transparent; color:var(--fc-text); border:1px solid var(--fc-border); box-shadow:none }
+  /* Tamaños amigables */
+  .btn.sm{ --btn-pad:8px 12px; --btn-radius:12px; font-weight:700 }
+  .btn.lg{ --btn-pad:13px 18px; --btn-radius:16px; font-size:1.02rem }
+  /* Estados deshabilitado */
+  button:disabled{ filter:grayscale(.35) opacity(.75); cursor:not-allowed }
+</style>
+
+
+<style id="fc-i18n-inline-css">
+  .fc-i18n-inline{display:flex;gap:8px;align-items:center}
+  .fc-i18n-inline .fc-emoji{font-size:14px;color:var(--fc-muted)}
+  .fc-i18n-inline .fc-select{border:1px solid var(--fc-border);border-radius:10px;padding:6px 10px;background:var(--fc-surface-2);color:var(--fc-text)}
+</style>
+
+
+<style id="fc-palette-soft">
+  :root{
+    --brand-ink:#0e2a4f;         /* azul profundo suave */
+    --brand-primary:#2aa6ff;     /* celeste principal */
+    --brand-celeste:#7cd5ff;     /* celeste claro */
+    --brand-celeste-50:#f1faff;  /* fondo muy claro */
+    --fc-accent: var(--brand-primary);
+    --fc-accent-2: var(--brand-celeste);
+  }
+  [data-theme="light"], :root:not([data-theme]){
+    --fc-bg:#f7fbff;
+    --fc-surface:#ffffff;
+    --fc-surface-2:#f4f9ff;
+    --fc-text:#0e2a4f;
+    --fc-muted:#4b6b92;
+    --fc-border:rgba(14,42,79,.12);
+    --fc-shadow:0 10px 28px rgba(14,42,79,.08);
+  }
+  [data-theme="dark"]{
+    --fc-bg:#0b1426;
+    --fc-surface:#0f1d36;
+    --fc-surface-2:#132546;
+    --fc-text:#e8f2ff;
+    --fc-muted:#9fbad8;
+    --fc-border:rgba(159,186,216,.18);
+    --fc-shadow:0 18px 40px rgba(3,14,33,.45);
+  }
+</style>
+
+
+<style id="fc-buttons-comic">
+  .btn, button{
+    border:2px solid rgba(14,42,79,.35);
+    box-shadow: 2px 4px 0 rgba(14,42,79,.25), 0 18px 36px rgba(29,127,216,.25);
+  }
+  .btn:hover, button:hover{ box-shadow: 4px 6px 0 rgba(14,42,79,.28), 0 26px 48px rgba(29,127,216,.35) }
+  .btn:active, button:active{ transform: translateY(1px); box-shadow: 2px 3px 0 rgba(14,42,79,.28), 0 18px 30px rgba(29,127,216,.3) }
+  .btn.ghost, button.ghost{ border:2px dashed rgba(14,42,79,.35) }
+  /* Esquinas más redondeadas y tipografía más bold para look historieta */
+  .btn, button{ border-radius:18px; font-weight:900 }
+</style>
+
+
+<style id="fc-branding">
+/* === Logo grande + animación de wordmark (usa colores de marca ya definidos) === */
+header .left { gap: 14px; }
+.fc-logo { display:inline-flex; align-items:center; gap:10px; user-select:none; }
+.fc-logo .fc-mark { width:44px; height:44px; border-radius:12px; box-shadow:0 8px 28px rgba(42,166,255,.35), inset 0 1px 0 rgba(255,255,255,.25);
+  background: conic-gradient(from 180deg, var(--brand-primary), var(--brand-celeste), var(--brand-primary));
+  position:relative; isolation:isolate; animation: fc-rotate 8s linear infinite; }
+.fc-logo .fc-wordmark { font-weight:900; letter-spacing:.6px; text-transform:uppercase; font-size:1.6rem; line-height:1; 
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-celeste));
+  -webkit-background-clip:text; background-clip:text; color:transparent; background-size:200% 100%;
+  animation: fc-shine 6s linear infinite; white-space:nowrap; }
+.fc-logo .fc-wordmark .fc-word-2 { margin-left:4px; }
+@keyframes fc-shine { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+@keyframes fc-rotate { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+/* Botones de acciones en deseos/necesidades más consistentes */
+.fc-wn-table .btn.sm { padding:6px 10px; border-radius:10px; }
+.fc-wn-table td:last-child { white-space:nowrap; }
+
+/* === Emoji de casa como logo === */
+.fc-logo-emoji{font-size:44px; line-height:1; display:inline-flex; align-items:center; justify-content:center; filter: drop-shadow(0 6px 16px rgba(42,166,255,.35));} 
+@media (max-width:640px){ .fc-logo-emoji{font-size:36px} }
+</style>
+
+</head>
+
+<body>
+
+<header>
+  <div class="left">
+    <div id="fc-i18n-widget" aria-label="Selector de país e idioma" class="fc-i18n-inline">
+      <strong class="fc-emoji">🌐</strong>
+      <select id="fc-country" class="fc-select"><option value="CO">🇨🇴 Colombia</option><option value="MX">🇲🇽 México</option><option value="AR">🇦🇷 Argentina</option><option value="CL">🇨🇱 Chile</option><option value="PE">🇵🇪 Perú</option><option value="US">🇺🇸 United States</option><option value="CA">🇨🇦 Canada</option><option value="GB">🇬🇧 United Kingdom</option><option value="EU">🇪🇺 Eurozone</option><option value="BR">🇧🇷 Brasil</option><option value="PT">🇵🇹 Portugal</option><option value="ES">🇪🇸 España</option><option value="FR">🇫🇷 France</option><option value="DE">🇩🇪 Deutschland</option><option value="IT">🇮🇹 Italia</option><option value="RU">🇷🇺 Россия</option><option value="CN">🇨🇳 中国</option><option value="JP">🇯🇵 日本</option><option value="KR">🇰🇷 한국</option><option value="IN">🇮🇳 India</option><option value="SA">🇸🇦 السعودية</option><option value="EG">🇪🇬 مصر</option><option value="BD">🇧🇩 বাংলাদেশ</option><option value="PK">🇵🇰 پاکستان</option></select>
+      <select id="fc-language" class="fc-select"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ru">Русский</option><option value="zh">中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="hi">हिन्दी</option><option value="ar">العربية</option><option value="bn">বাংলা</option><option value="ur">اردو</option></select>
+    </div>
+     <div class="fc-logo" aria-label="FamilyCeleste">
+   <span id="fc-logo-emoji" class="fc-logo-emoji" role="img" aria-label="Inicio">🏠</span>
+   <span class="fc-wordmark"><span class="fc-word-1">FAMILY</span><span class="fc-word-2">CELESTE</span></span>
+ </div></div>
+  <div class="right top-controls">
+    <select id="currencySelect" title="Moneda">
+      <option value="COP" selected>COP</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="MXN">MXN</option><option value="ARS">ARS</option><option value="CLP">CLP</option><option value="PEN">PEN</option>
+    </select>
+    <input id="familyCode" placeholder="Código familia" />
+    <button id="btnCloudLogin" class="btn-outline" style="width:auto;">Nube</button>
+    <button id="themeToggle" class="theme-toggle" title="Modo claro/oscuro">🌙</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ===== Portada / Intro ===== -->
+  <div class="card hero" id="sec_intro">
+    <span class="badge">👨‍👩‍👧 Family Celeste</span>
+    <h2>Gestiona gastos, manutención, agenda y evidencias legales</h2>
+    <p>Todo en un mismo lugar. Compatible con nube (Firebase), con tema claro/oscuro y familias sin límite de integrantes.</p>
+    <div class="grid-2">
+      <button id="btnLogin">Iniciar sesión (local)</button>
+      <button class="btn-outline" id="btnVincular">Vincular con otro padre</button>
+    </div>
+    <button class="btn-outline" id="btnRegistrar">Completar Perfil Legal</button>
+  </div>
+
+  <!-- ===== Pagos de manutención ===== -->
+  <div class="card" id="sec_manutencion">
+    <h2>💳 Pagos de manutención</h2>
+    <div class="grid-3">
+      <div><label>Monto base mensual (<span id="lblMonedaM">COP</span>)</label><input id="payAmount" type="number" min="0" step="1000" placeholder="Ej: 500000"></div>
+      <div><label>Quién paga</label><input id="payPayer" placeholder="Ej: Padre (Jacob G)"></div>
+      <div><label>Día de vencimiento</label>
+        <select id="payDueDay"><option>1</option><option>5</option><option>10</option><option>15</option><option>20</option><option>25</option><option selected>30</option></select>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div><label>IPC anual (%)</label><input id="ipcRate" type="number" min="0" step="0.1" value="9.3" /></div>
+      <div><label>Fecha de ajuste IPC (cada año)</label><input id="ipcDate" type="date" /></div>
+      <div style="display:flex; align-items:flex-end;"><button id="btnSaveMaint" class="btn-outline">Guardar parámetros</button></div>
+    </div>
+    <div class="grid-2" style="margin-top:8px;">
+      <div class="ok" id="maintInfo">Configura el monto, quién paga y el día de vencimiento. El sistema aplicará el IPC cada año automáticamente.</div>
+      <div class="tag" id="maintStatusTag">Estado: —</div>
+    </div>
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+    <h3>Calendario de pagos (12 meses)</h3>
+    <div class="grid-2">
+      <div><label>Generar desde (mes)</label><input id="maintFrom" type="month"></div>
+      <div style="display:flex; align-items:flex-end;"><button id="btnGenSchedule">Generar calendario</button></div>
+    </div>
+    <table class="table" id="maintTable" style="margin-top:8px;">
+      <thead><tr><th>Mes</th><th>Vencimiento</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+      <button id="btnMaintDeleteAll" class="btn-outline">Borrar calendario (local)</button>
+    </div>
+  </div>
+
+  <!-- ===== Resumen / Hoy ===== -->
+  <div class="card" id="sec_resumen">
+    <h2>✨ Hoy</h2>
+    <div class="tiles">
+      <div class="tile">
+        <h3>⏰ Próximas citas</h3>
+        <div class="big" id="tileCitas">0</div>
+        <div class="small" id="tileCitasTxt">Sin citas</div>
+      </div>
+      <div class="tile">
+        <h3>💸 Gastado hoy</h3>
+        <div class="big" id="tileGastoHoy">COP&nbsp;0</div>
+        <div class="small" id="tileMovsHoy">0 movimientos</div>
+      </div>
+    </div>
+
+    <div id="maintAlerts" style="margin-top:10px;"></div>
+
+    <h2 style="margin-top:14px;">Resumen de gastos</h2>
+    <div class="summary">
+      <div class="kpi"><div class="value" id="kpiTotal">COP&nbsp;0</div><div class="small" id="kpiMovs">0 categorías</div></div>
+      <div class="kpi"><div class="value" id="kpiTopCat">—</div><div class="small" id="kpiTopVal">—</div></div>
+    </div>
+    <div class="progress" style="margin-top:8px;"><span id="bar" style="width:0%"></span></div>
+    <div class="small" id="barLabel" style="margin-top:4px;">0% de 1.000.000 COP</div>
+
+    <div class="row-2" style="margin-top:10px;">
+      <div><label>Presupuesto (<span id="monedaLabel">COP</span>)</label><input type="number" id="inpPresupuesto" min="0" step="1000" placeholder="Ej: 1000000"></div>
+      <div style="display:flex; align-items:flex-end;"><button id="btnGuardarPresupuesto" class="btn-outline" style="width:100%;">Actualizar presupuesto</button></div>
+    </div>
+
+    <div class="row-2" style="margin-top:12px;">
+      <button class="btn-ghost" id="btnVerDetalles">Ver Detalles</button>
+      <button id="btnReporteMensual">Informe mensual (PDF)</button>
+    </div>
+  </div>
+
+  <!-- ===== Categorías rápidas ===== -->
+  <div class="card" id="sec_quick">
+    <h2>Categorías rápidas</h2>
+    <div class="quick-cats">
+      <div class="quick-cat" data-cat="Salud"><span class="emoji">➕</span><span>Salud</span></div>
+      <div class="quick-cat" data-cat="Educación"><span class="emoji">🎒</span><span>Educación</span></div>
+      <div class="quick-cat" data-cat="Alimentación"><span class="emoji">🍽️</span><span>Alimentación</span></div>
+      <div class="quick-cat" data-cat="Recreación"><span class="emoji">⚽</span><span>Recreación</span></div>
+      <div class="quick-cat" data-cat="Ropa"><span class="emoji">👕</span><span>Ropa</span></div>
+      <div class="quick-cat" data-cat="Vivienda"><span class="emoji">🏠</span><span>Vivienda</span></div>
+    </div>
+  </div>
+
+  <!-- ===== Registrar gasto ===== -->
+  <div class="card" id="sec_gasto">
+    <h2>Registrar gasto</h2>
+    <label>Categoría</label>
+    <select id="categoria">
+      <option>Educación</option><option>Salud</option><option>Alimentación</option><option>Ropa</option><option>Recreación</option><option>Vivienda</option>
+    </select>
+    <label>Valor (<span id="monedaLabel2">COP</span>)</label>
+    <input type="number" id="valor" placeholder="Ej: 150000">
+    <label>Fecha (opcional)</label>
+    <input type="datetime-local" id="gFecha">
+    <label>Nota (opcional)</label>
+    <input id="gNota" placeholder="Ej: Útiles escolares / copago / mercado">
+    <button onclick="agregarGasto()">Agregar gasto</button>
+  </div>
+
+  <!-- ===== Tabla de gastos ===== -->
+  <div class="card" id="sec_tabla">
+    <h2>Gastos registrados</h2>
+    <div class="row-2" style="margin-top:0;">
+      <button id="btnSyncMovsUp" class="btn-outline">Subir a la nube</button>
+      <button id="btnSyncMovsDown" class="btn-outline">Cargar desde la nube</button>
+    </div>
+    <table class="table">
+      <thead><tr><th>Fecha</th><th>Categoría</th><th>Valor</th><th>Nota</th><th>Acciones</th></tr></thead>
+      <tbody id="tablaGastos"></tbody>
+    </table>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+      <button id="btnMovsDeleteAll" class="btn-outline">Borrar todos los gastos (local)</button>
+    </div>
+  </div>
+
+  <!-- ===== Gráfico ===== -->
+  <div class="card" id="sec_grafico">
+    <h2>Distribución de gastos</h2>
+    <canvas id="grafico"></canvas>
+  </div>
+
+  <!-- ===== Comprobantes ===== -->
+  <div class="card upload" id="sec_comprobantes">
+    <h2>Comprobantes</h2>
+    <p class="small">Adjunta recibos o fotos. Se guardan localmente o en la nube si inicias sesión.</p>
+    <div class="row-2" style="margin-top:0;">
+      <label for="fileInput" class="upload-btn" style="text-align:center;">Cargar imagen</label>
+      <button id="btnPDF" class="btn-outline">PDF comprobantes</button>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple />
+    <div class="preview" id="preview"></div>
+    <div class="row-2" style="margin-top:8px;">
+      <button id="btnRecSelectMode" class="btn-outline">Seleccionar</button>
+      <div style="display:flex; gap:8px;">
+        <button id="btnRecDeleteSel" class="btn-outline">Borrar seleccionados</button>
+        <button id="btnRecDeleteAll" class="btn-outline">Borrar todo (local)</button>
+      </div>
+    </div>
+    <div class="row-2" style="margin-top:10px;">
+      <button id="btnSyncComprobantes" class="btn-outline">Subir a la nube</button>
+      <button id="btnLoadComprobantes" class="btn-outline">Cargar desde la nube</button>
+    </div>
+  </div>
+
+  <!-- ===== Documentos importantes ===== -->
+  <div class="card upload" id="sec_docs">
+    <h2>📁 Documentos importantes</h2>
+    <p class="small">PDFs o imágenes (vacunas, contratos, certificados).</p>
+    <div class="row-2" style="margin-top:0;">
+      <label for="docInput" class="upload-btn" style="text-align:center;">Añadir documento</label>
+      <button id="btnExcel" class="btn-outline">Descargar Excel</button>
+    </div>
+    <input type="file" id="docInput" accept="application/pdf,image/*" multiple />
+    <div id="docsList" class="small"></div>
+    <div class="row-2" style="margin-top:8px;">
+      <button id="btnDocSelectMode" class="btn-outline">Seleccionar</button>
+      <div style="display:flex; gap:8px;">
+        <button id="btnDocDeleteSel" class="btn-outline">Borrar seleccionados</button>
+        <button id="btnDocDeleteAll" class="btn-outline">Borrar todo (local)</button>
+      </div>
+    </div>
+    <div class="row-2" style="margin-top:8px;">
+      <button id="btnDocsCloudUp" class="btn-outline">Subir a la nube</button>
+      <button id="btnDocsCloudList" class="btn-outline">Listar/descargar nube</button>
+    </div>
+    <div id="docsCloudList" class="small"></div>
+  </div>
+
+  <!-- ===== Agenda de Cuidado (MEJORADA) ===== -->
+  <div class="card" id="sec_agenda">
+    <div class="section-title"><h2>📅 Agenda de Cuidado / Legal</h2></div>
+
+    <!-- Formulario extendido -->
+    <div class="grid-3">
+      <div>
+        <label>Categoría</label>
+        <select id="agCat">
+          <option value="Juzgado">⚖️ Juzgado</option>
+          <option value="Audiencia">📜 Audiencia</option>
+          <option value="ICBF">🏛️ ICBF</option>
+          <option value="Mediación">🤝 Mediación / Comisaría</option>
+          <option value="Abogado">👩‍⚖️ Abogado/Defensor</option>
+          <option value="Pediatra">🩺 Pediatra</option>
+          <option value="Colegio">🏫 Colegio</option>
+          <option value="Entrega/Traslado">🚗 Entrega/Traslado</option>
+          <option value="Pagos">💳 Pagos</option>
+          <option value="Alimentación">🍽️ Alimentación</option>
+          <option value="Medicina">💊 Medicina</option>
+          <option value="Sueño">😴 Sueño</option>
+          <option value="Terapia">🧩 Terapia</option>
+          <option value="Recreación">⚽ Recreación</option>
+        </select>
+      </div>
+      <div><label>Fecha</label><input type="date" id="agFecha"></div>
+      <div><label>Hora</label><input type="time" id="agHora"></div>
+    </div>
+
+    <div class="grid-3" style="margin-top:10px;">
+      <div><label>Lugar (opcional)</label><input id="agLugar" placeholder="Ej: Juzgado 12 de Familia, Sala 3"></div>
+      <div><label>Participantes (opcional)</label><input id="agPeople" placeholder="Ej: Valentina, Celeste, Abogado"></div>
+      <div><label>Prioridad</label>
+        <select id="agPrio"><option value="alta">🔴 Alta</option><option value="media" selected>🟡 Media</option><option value="baja">🟢 Baja</option></select>
+      </div>
+    </div>
+
+    <div class="row-2" style="margin-top:10px;">
+      <div>
+        <label>Stickers</label>
+        <select id="agSticker">
+          <option value="⚖️">⚖️</option><option value="📜">📜</option><option value="🏛️">🏛️</option><option value="🤝">🤝</option>
+          <option value="👩‍⚖️">👩‍⚖️</option><option value="🩺">🩺</option><option value="🏫">🏫</option><option value="🚗">🚗</option>
+          <option value="💳">💳</option><option value="🥣">🥣</option><option value="💉">💉</option><option value="🛌">🛌</option>
+          <option value="🧸">🧸</option><option value="📚">📚</option>
+        </select>
+      </div>
+      <div><label>Notas (opcional)</label><input id="agNota" placeholder="Ej: Llevar sentencia / historias clínicas"></div>
+    </div>
+
+    <div class="grid-3" style="margin-top:8px;">
+      <div>
+        <label>Recordatorio</label>
+        <select id="agRem"><option value="none" selected>—</option><option value="24h">24 horas antes</option><option value="3h">3 horas antes</option><option value="30m">30 minutos antes</option></select>
+      </div>
+      <div>
+        <label>Adjunto (opcional)</label>
+        <input id="agAdj" type="file" accept="image/*,application/pdf">
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button id="btnAddCita">Agregar cita</button>
+      </div>
+    </div>
+
+    <!-- Mini-calendario -->
+    <div class="calendar" id="miniCal" style="margin-top:10px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px; border-bottom:1px dashed var(--border);">
+        <button class="btn-outline" id="prevMes" style="width:auto;padding:8px 10px;">‹</button>
+        <strong id="mesLeyenda"></strong>
+        <button class="btn-outline" id="nextMes" style="width:auto;padding:8px 10px;">›</button>
+      </div>
+      <div class="cal-head">
+        <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <h3 style="margin-top:14px;">⏰ Próximas 24 h</h3>
+    <div id="agendaList"></div>
+
+    <h3 style="margin-top:14px;">📌 Próxima cita</h3>
+    <div id="nextAppt" class="msg small">Sin próxima cita</div>
+
+    <h3 style="margin-top:14px;">📅 Agenda de hoy</h3>
+    <div id="agendaHoy"></div>
+
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+      <button id="btnAgendaDeleteAll" class="btn-outline">Borrar toda la agenda (local)</button>
+    </div>
+  </div>
+
+  <!-- ===== Chat ===== -->
+  <div class="card" id="sec_chat">
+    <h2>💬 Chat de la familia</h2>
+    <div class="row-2">
+      <input id="chatName" placeholder="Tu nombre / rol">
+      <button id="btnChatJoin" class="btn-outline">Establecer nombre</button>
+    </div>
+    <textarea id="chatInput" placeholder="Escribe un mensaje cordial…"></textarea>
+    <div class="row-2">
+      <button id="chatSend">Enviar</button>
+      <button class="btn-outline" id="chatClear">Limpiar chat local</button>
+    </div>
+    <div id="chatList" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- ===== Mercado / Trueque ===== -->
+  <div class="card" id="sec_mercado">
+    <h2>♻️ Mercado / Trueque</h2>
+    <div class="grid-2">
+      <div><label>Título</label><input id="mkTitle" placeholder="Ej: Cuna madera, ropa 0-6 meses"></div>
+      <div><label>Tipo</label>
+        <select id="mkType"><option value="intercambio">Intercambio</option><option value="donación">Donación</option><option value="venta">Venta</option></select>
+      </div>
+    </div>
+    <label>Descripción</label>
+    <textarea id="mkDesc" placeholder="Estado, marca, detalles"></textarea>
+    <div class="row-2">
+      <label class="upload-btn" for="mkImg">Añadir imagen</label>
+      <button id="mkPublish">Publicar</button>
+    </div>
+    <input type="file" id="mkImg" accept="image/*" style="display:none">
+    <div class="preview" id="mkPreview"></div>
+
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+    <div class="row-2">
+      <input id="mkSearch" placeholder="Buscar artículos…">
+      <select id="mkFilter"><option value="">Todos</option><option value="intercambio">Intercambio</option><option value="donación">Donación</option><option value="venta">Venta</option></select>
+    </div>
+    <div id="mkList" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- ===== Cupones / Bonos ===== -->
+  <div class="card" id="sec_cupones">
+    <h2>🛍️ 
+<section id="fc-wish-need" aria-label="Lista de deseos y necesidades del menor" class="fc-block">
+  <h2>🎁 Lista de deseos & 🧩 Lista de necesidades del menor</h2>
+  <p style="margin-top:-4px;color:var(--fc-muted)">Planifica qué <strong>desea</strong> y qué <strong>necesita</strong> Celeste. Priorización, estimaciones, responsables y seguimiento visual.</p>
+  <div id="fc-wn-grid" style="display:grid;grid-template-columns:1fr;gap:20px">
+    <div class="fc-card" id="fc-wishes">
+      <h3>🎁 Deseos</h3>
+      <div class="fc-badges" id="fc-wish-templates"></div>
+      <div class="fc-wn-form" style="display:grid;grid-template-columns:1.3fr .9fr .8fr .9fr .9fr 1.1fr;gap:8px;margin-bottom:10px">
+        <input id="fc-wish-title" placeholder="Artículo / experiencia" />
+        <select id="fc-wish-cat"><option>Recreación</option><option>Educación</option><option>Tecnología</option><option>Ropa</option><option>Salud</option><option>Otro</option></select>
+        <select id="fc-wish-prio"><option>Alta</option><option>Media</option><option>Baja</option></select>
+        <input id="fc-wish-date" type="date" />
+        <input id="fc-wish-cost" type="number" min="0" step="1000" placeholder="Costo estimado" />
+        <input id="fc-wish-owner" placeholder="Responsable (ej.: Valentina)" />
+      </div>
+      <div class="fc-wn-actions" style="display:flex;gap:8px">
+        <button id="fc-wish-add" class="btn lg">➕ Agregar deseo</button>
+        <button class="secondary btn" id="fc-wish-export">⬇️ Exportar CSV</button>
+      </div>
+      <div class="fc-progress" title="Progreso de cumplimiento" style="height:10px;background:rgba(46,168,255,.15);border-radius:999px;overflow:hidden;margin-top:10px"><span id="fc-wish-progress" style="display:block;height:100%;background:linear-gradient(90deg,#22c55e,#84cc16);width:0%"></span></div>
+      <table class="fc-wn-table" id="fc-wish-table" aria-label="Tabla de deseos" style="width:100%;border-collapse:separate;border-spacing:0 6px">
+        <thead><tr><th>Artículo</th><th>Categoría</th><th>Prioridad</th><th>Fecha objetivo</th><th>Estimado</th><th>Responsable</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="fc-card" id="fc-needs">
+      <h3>🧩 Necesidades</h3>
+      <div class="fc-badges" id="fc-need-templates"></div>
+      <div class="fc-wn-form" style="display:grid;grid-template-columns:1.3fr .9fr .8fr .9fr .9fr 1.1fr;gap:8px;margin-bottom:10px">
+        <input id="fc-need-title" placeholder="Necesidad (p. ej., vacunas, uniforme)" />
+        <select id="fc-need-cat"><option>Salud</option><option>Educación</option><option>Alimentación</option><option>Transporte</option><option>Vivienda</option><option>Otro</option></select>
+        <select id="fc-need-prio"><option>Alta</option><option>Media</option><option>Baja</option></select>
+        <input id="fc-need-date" type="date" />
+        <input id="fc-need-cost" type="number" min="0" step="1000" placeholder="Costo estimado" />
+        <input id="fc-need-owner" placeholder="Responsable (ej.: Valentina)" />
+      </div>
+      <div class="fc-wn-actions" style="display:flex;gap:8px">
+        <button id="fc-need-add" class="btn lg">➕ Agregar necesidad</button>
+        <button class="secondary btn" id="fc-need-export">⬇️ Exportar CSV</button>
+      </div>
+      <div class="fc-progress" title="Progreso de cobertura" style="height:10px;background:rgba(46,168,255,.15);border-radius:999px;overflow:hidden;margin-top:10px"><span id="fc-need-progress" style="display:block;height:100%;background:linear-gradient(90deg,#22c55e,#84cc16);width:0%"></span></div>
+      <table class="fc-wn-table" id="fc-need-table" aria-label="Tabla de necesidades" style="width:100%;border-collapse:separate;border-spacing:0 6px">
+        <thead><tr><th>Necesidad</th><th>Categoría</th><th>Prioridad</th><th>Fecha objetivo</th><th>Estimado</th><th>Responsable</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<script>(function(){
+  const S={W:'fc_wishlist', N:'fc_needslist'}; const $=s=>document.querySelector(s);
+  const fmt=(n)=> new Intl.NumberFormat(undefined,{style:'currency',currency:(window.fcCurrency||'COP'),maximumFractionDigits:0}).format(Number(n||0));
+  const load=(k)=>{try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}; const save=(k,d)=>localStorage.setItem(k,JSON.stringify(d));
+  const calcP=a=>{const d=a.filter(x=>x.status==='Completado').length; return a.length? Math.round(d*100/a.length):0};
+  function render(k,tableSel,progressSel){const data=load(k); const tb=$(tableSel+' tbody'); tb.innerHTML=''; data.forEach((x,i)=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${x.title}</td><td>${x.cat}</td><td>${x.prio}</td><td>${x.date||''}</td><td>${fmt(x.cost||0)}</td><td>${x.owner||''}</td><td>${x.status||'Pendiente'}</td><td><button data-act="toggle" data-i="${i}" data-key="${k}" class="btn sm">✓</button>  <button data-act=\"edit\" data-i=\"${i}\" data-key=\"${k}\" class=\"btn sm ghost\">✏️</button> <button data-act="del" data-i="${i}" data-key="${k}" class="btn sm secondary">🗑️</button></td>`; tb.appendChild(tr)}); const p=calcP(data); const bar=$(progressSel); if(bar) bar.style.width=p+'%'; }
+  function addItem(k,fields){const arr=load(k); arr.unshift({...fields,status:'Pendiente',createdAt:Date.now()}); save(k,arr)}
+  function exportCSV(k,filename){const rows=load(k); if(!rows.length){alert('No hay datos para exportar'); return;} const headers=['Titulo/Item','Categoria','Prioridad','Fecha objetivo','Costo estimado','Responsable','Estado']; const body=rows.map(r=>[r.title,r.cat,r.prio,r.date,r.cost,r.owner,r.status].map(v=>`"${(v??'').toString().replace(/"/g,'""')}"`).join(',')); const csv=[headers.join(','),...body].join('
+'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href); }
+  const wishTpl=[{title:'Paseo al museo para Celeste',cat:'Recreación',prio:'Media'},{title:'Tableta educativa',cat:'Tecnología',prio:'Alta'},{title:'Curso de pintura',cat:'Educación',prio:'Media'}];
+  const needTpl=[{title:'Esquema de vacunas',cat:'Salud',prio:'Alta'},{title:'Uniforme escolar',cat:'Educación',prio:'Alta'},{title:'Lentes oftálmicos',cat:'Salud',prio:'Media'}];
+  function chips(containerSel,tpl,form){const el=$(containerSel); if(!el) return; tpl.forEach(t=>{const b=document.createElement('span'); b.className='fc-badge'; b.textContent=t.title; b.onclick=()=>{ $(form.title).value=t.title; $(form.cat).value=t.cat; $(form.prio).value=t.prio; }; el.appendChild(b);});}
+  chips('#fc-wish-templates',wishTpl,{title:'#fc-wish-title',cat:'#fc-wish-cat',prio:'#fc-wish-prio'});
+  chips('#fc-need-templates',needTpl,{title:'#fc-need-title',cat:'#fc-need-cat',prio:'#fc-need-prio'});
+  const wAdd=$('#fc-wish-add'); if(wAdd) wAdd.addEventListener('click',()=>{const title=$('#fc-wish-title').value.trim(); if(!title){alert('Escribe el artículo/experiencia'); return;}addItem(S.W,{title,cat:$('#fc-wish-cat').value,prio:$('#fc-wish-prio').value,date:$('#fc-wish-date').value,cost:$('#fc-wish-cost').value,owner:$('#fc-wish-owner').value});['#fc-wish-title','#fc-wish-date','#fc-wish-cost','#fc-wish-owner'].forEach(s=>{const el=$(s); if(el) el.value='';});render(S.W,'#fc-wish-table','#fc-wish-progress')});
+  const wExp=$('#fc-wish-export'); if(wExp) wExp.addEventListener('click',()=>exportCSV(S.W,'lista_deseos.csv'));
+  const nAdd=$('#fc-need-add'); if(nAdd) nAdd.addEventListener('click',()=>{const title=$('#fc-need-title').value.trim(); if(!title){alert('Describe la necesidad'); return;}addItem(S.N,{title,cat:$('#fc-need-cat').value,prio:$('#fc-need-prio').value,date:$('#fc-need-date').value,cost:$('#fc-need-cost').value,owner:$('#fc-need-owner').value});['#fc-need-title','#fc-need-date','#fc-need-cost','#fc-need-owner'].forEach(s=>{const el=$(s); if(el) el.value='';});render(S.N,'#fc-need-table','#fc-need-progress')});
+  const nExp=$('#fc-need-export'); if(nExp) nExp.addEventListener('click',()=>exportCSV(S.N,'lista_necesidades.csv'));
+  document.addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return; const a=b.getAttribute('data-act'); const k=b.getAttribute('data-key'); const i=+b.getAttribute('data-i'); if(!k) return; const arr=load(k); if(a==='toggle'){arr[i].status = arr[i].status==='Completado'?'Pendiente':'Completado';} else if(a==='edit'){const item=arr[i]; const nt=prompt('Título', item.title||''); if(nt===null) return; const nc=prompt('Categoría', item.cat||''); if(nc===null) return; const np=prompt('Prioridad (Alta/Media/Baja)', item.prio||'Media'); if(np===null) return; const nd=prompt('Fecha objetivo (YYYY-MM-DD)', item.date||''); if(nd===null) return; const nco=prompt('Costo estimado', item.cost||''); if(nco===null) return; const no=prompt('Responsable', item.owner||''); if(no===null) return; item.title=nt; item.cat=nc; item.prio=np; item.date=nd; item.cost=nco; item.owner=no; item._lastUpdated=Date.now();} else if(a==='del'){arr.splice(i,1)} save(k,arr); render(k, k===S.W?'#fc-wish-table':'#fc-need-table', k===S.W?'#fc-wish-progress':'#fc-need-progress');});
+  render(S.W,'#fc-wish-table','#fc-wish-progress'); render(S.N,'#fc-need-table','#fc-need-progress');
+})();
+</script>
+Cupones y Bonos</h2>
+    <div class="tag" id="cpPointsTag">Puntos: 0</div>
+    <div class="row-2">
+      <input id="cpSearch" placeholder="Buscar cupón…">
+      <select id="cpFilter">
+        <option value="">Todos</option><option value="supermercado">Supermercado</option><option value="drogueria">Droguería</option><option value="bebes">Productos bebé</option><option value="salud">Salud y bienestar</option><option value="hogar">Hogar</option><option value="educacion">Educación</option>
+      </select>
+    </div>
+    <div id="cpList" class="coupon-grid" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- ===== Crecimiento y Rutinas ===== -->
+  <div class="card" id="sec_crecimiento">
+    <h2>🌱 Crecimiento y Rutinas</h2>
+    <div class="grid-3">
+      <div><label>Altura (cm)</label><input id="gAltura" type="number" min="0" step="0.1" placeholder="Ej: 95.4"></div>
+      <div><label>Peso (kg)</label><input id="gPeso" type="number" min="0" step="0.1" placeholder="Ej: 14.2"></div>
+      <div><label>Ánimo</label>
+        <select id="gAnimo"><option value="😊">😊 Feliz</option><option value="😐">😐 Normal</option><option value="😢">😢 Triste</option></select>
+      </div>
+    </div>
+    <div class="row-2">
+      <div><label>Logro del día</label><input id="gLogro" placeholder="Ej: Dijo una palabra nueva"></div>
+      <div style="display:flex; align-items:flex-end;"><button id="btnAddGrowth" class="btn-outline" style="width:100%;">Registrar</button></div>
+    </div>
+    <div class="grid-2" style="margin-top:10px;">
+      <div class="card" style="padding:12px;"><canvas id="chartAltura"></canvas></div>
+      <div class="card" style="padding:12px;"><canvas id="chartPeso"></canvas></div>
+    </div>
+    <div id="growthList" class="small" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- ===== Miembros / Hijos ===== -->
+  <div class="card" id="sec_miembros">
+    <h2>👪 Miembros de la familia </h2>
+    <div class="grid-3">
+      <div><label>Rol</label>
+        <select id="mbRol"><option>Madre</option><option>Padre</option><option>Tutor(a)</option><option>Abuelo/a</option><option>Otro</option></select>
+      </div>
+      <div><label>Nombre</label><input id="mbNombre"></div>
+      <div><label>Documento</label><input id="mbDoc"></div>
+    </div>
+    <div class="row-2">
+      <div><label>Teléfono</label><input id="mbTel"></div>
+      <div><label>Correo</label><input id="mbMail"></div>
+    </div>
+    <div class="row-2">
+      <button id="btnAddMember">Agregar miembro</button>
+      <button class="btn-outline" id="btnSyncMembers">Sincronizar nube</button>
+    </div>
+    <div class="list" id="membersList" style="margin-top:8px;"></div>
+
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+    <h3>🧒 Hijos</h3>
+    <div class="grid-3">
+      <div><label>Nombre</label><input id="chNombre"></div>
+      <div><label>Documento</label><input id="chDoc"></div>
+      <div><label>Nacimiento</label><input id="chNac" type="date"></div>
+    </div>
+    <div class="grid-3">
+      <div><label>Tipo sangre</label>
+        <select id="chSangre"><option>O+</option><option>O-</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option></select>
+      </div>
+      <div><label>Alergias</label><input id="chAlerg"></div>
+      <div><label>Colegio/Curso</label><input id="chSchool"></div>
+    </div>
+    <div class="row-2">
+      <button id="btnAddChild">Agregar hijo/a</button>
+      <button class="btn-outline" id="btnSyncChildren">Sincronizar nube</button>
+    </div>
+    <div class="list" id="childrenList" style="margin-top:8px;"></div>
+  </div>
+
+  <!-- ===== Perfil Legal & Custodia ===== -->
+  <div class="card" id="perfilLegalCard">
+    <h2 class="section-title">👥 Perfil Familiar y Custodia</h2>
+    <p class="small">Registra los datos de los representantes, del menor y los acuerdos/órdenes de custodia. Todo se guarda localmente (o en la nube si la activas).</p>
+
+    <h3>👩 Madre</h3>
+    <div class="grid-3">
+      <div><label>Nombre completo</label><input id="m_nombre" placeholder="Ej: Valentina G"></div>
+      <div><label>Tipo y N° de documento</label><input id="m_doc" placeholder="CC 12345678"></div>
+      <div><label>Teléfono</label><input id="m_tel" placeholder="300 123 4567"></div>
+    </div>
+    <div class="row-2">
+      <div><label>Correo</label><input id="m_mail" placeholder="Valentina@email.com"></div>
+      <div><label>Dirección</label><input id="m_dir" placeholder="Calle 123 #45-67"></div>
+    </div>
+
+    <h3>👨 Padre</h3>
+    <div class="grid-3">
+      <div><label>Nombre completo</label><input id="p_nombre" placeholder="Ej:xxxxxxxx"></div>
+      <div><label>Tipo y N° de documento</label><input id="p_doc" placeholder="CC 87654321"></div>
+      <div><label>Teléfono</label><input id="p_tel" placeholder="310 987 6543"></div>
+    </div>
+    <div class="row-2">
+      <div><label>Correo</label><input id="p_mail" placeholder="xxxxxxxxx@email.com"></div>
+      <div><label>Dirección</label><input id="p_dir" placeholder="Cra 45 #12-34"></div>
+    </div>
+
+    <h3>👤 Tutor(a) legal (si aplica)</h3>
+    <div class="grid-3">
+      <div><label>Nombre completo</label><input id="t_nombre" placeholder="Ej: Alexandra M"></div>
+      <div><label>Tipo y N° de documento</label><input id="t_doc" placeholder="CC 1010..."></div>
+      <div><label>Teléfono</label><input id="t_tel" placeholder="320 000 0000"></div>
+    </div>
+    <div class="row-2">
+      <div><label>Correo</label><input id="t_mail" placeholder="Alexandra@email.com"></div>
+      <div><label>Dirección</label><input id="t_dir" placeholder="Av. Principal 1-23"></div>
+    </div>
+
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+
+    <h3>🧒 Hijo(a)</h3>
+    <div class="grid-3">
+      <div><label>Nombre completo</label><input id="h_nombre" placeholder="Ej: Celeste"></div>
+      <div><label>Tipo y N° de documento</label><input id="h_doc" placeholder="RC/TI ..."></div>
+      <div><label>Fecha de nacimiento</label><input id="h_nac" type="date"></div>
+    </div>
+    <div class="grid-3">
+      <div><label>Sangre</label>
+        <select id="h_sangre"><option>O+</option><option>O-</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option></select>
+      </div>
+      <div><label>Alergias</label><input id="h_alerg" placeholder="Ej: Amoxicilina"></div>
+      <div><label>Colegio/Curso</label><input id="h_school" placeholder="Colegio / Grado"></div>
+    </div>
+
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+
+    <h3>⚖️ Custodia</h3>
+    <div class="grid-3">
+      <div><label>Tipo de custodia</label>
+        <select id="c_tipo"><option>Compartida</option><option>Exclusiva (Madre)</option><option>Exclusiva (Padre)</option><option>Alternada</option><option>Temporal</option><option>Otra</option></select>
+      </div>
+      <div><label>Guardador(a) legal principal</label>
+        <select id="c_guardian"><option>Madre</option><option>Padre</option><option>Tutor(a)</option></select>
+      </div>
+      <div><label>N° de orden / proceso (opcional)</label><input id="c_orden" placeholder="Radicado / Proceso"></div>
+    </div>
+    <div class="grid-3">
+      <div>
+        <label>Días de visita</label>
+        <select id="c_vis_dias" multiple size="5">
+          <option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option>
+        </select>
+        <div class="small">Mantén Ctrl/⌘ para elegir varios</div>
+      </div>
+      <div><label>Hora inicio (visitas)</label><input id="c_vis_ini" type="time"></div>
+      <div><label>Hora fin (visitas)</label><input id="c_vis_fin" type="time"></div>
+    </div>
+    <div class="row-2">
+      <div><label>Lugar de recogida/devolución</label><input id="c_lugar" placeholder="Dirección / Punto de encuentro"></div>
+      <div>
+        <label>Autorizaciones</label>
+        <div class="tag"><input id="c_aut_med" type="checkbox"> Atención médica de urgencia</div>
+        <div class="tag"><input id="c_aut_salida" type="checkbox"> Salida del país (según orden)</div>
+      </div>
+    </div>
+
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+
+    <h3>✅ Autorizados a recoger</h3>
+    <div class="grid-3">
+      <div><label>Nombre</label><input id="au_nom"></div>
+      <div><label>Documento</label><input id="au_doc"></div>
+      <div style="display:flex; align-items:flex-end;"><button id="btnAddAut" class="btn-outline" style="width:100%;">Agregar</button></div>
+    </div>
+    <div class="list" id="autList"></div>
+
+    <h3>🆘 Contactos de emergencia</h3>
+    <div class="grid-3">
+      <div><label>Nombre</label><input id="em_nom"></div>
+      <div><label>Teléfono</label><input id="em_tel"></div>
+      <div style="display:flex; align-items:flex-end;"><button id="btnAddEmer" class="btn-outline" style="width:100%;">Agregar</button></div>
+    </div>
+    <div class="list" id="emerList"></div>
+
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+
+    <h3>🖊️ Firmas</h3>
+    <div class="grid-3">
+      <div>
+        <div class="small">Firma Madre</div>
+        <canvas id="sigMadre" style="width:100%;height:120px;background:#fff;border:1px dashed var(--border);border-radius:10px;"></canvas>
+        <div class="row-2">
+          <button id="sigMadreClear" class="btn-outline">Limpiar</button>
+          <button id="sigMadreSave">Guardar firma</button>
+        </div>
+      </div>
+      <div>
+        <div class="small">Firma Padre</div>
+        <canvas id="sigPadre" style="width:100%;height:120px;background:#fff;border:1px dashed var(--border);border-radius:10px;"></canvas>
+        <div class="row-2">
+          <button id="sigPadreClear" class="btn-outline">Limpiar</button>
+          <button id="sigPadreSave">Guardar firma</button>
+        </div>
+      </div>
+      <div>
+        <div class="small">Firma Tutor(a)</div>
+        <canvas id="sigTutor" style="width:100%;height:120px;background:#fff;border:1px dashed var(--border);border-radius:10px;"></canvas>
+        <div class="row-2">
+          <button id="sigTutorClear" class="btn-outline">Limpiar</button>
+          <button id="sigTutorSave">Guardar firma</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tag" style="margin-top:10px;">
+      <input id="consentChk" type="checkbox"> Autorizo el tratamiento de datos personales con fines de gestión familiar.
+    </div>
+    <div class="small" id="consentInfo"></div>
+
+    <div class="row-2" style="margin-top:12px;">
+      <button id="btnSavePerfil">Guardar perfil</button>
+      <button class="btn-outline" id="btnPDFPerfil">Exportar Ficha (PDF)</button>
+    </div>
+
+    <div id="perfilMsg" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- ===== Incidencias de custodia ===== -->
+  <div class="card" id="sec_incidencias">
+    <h2>⚖️ Incidencias de Custodia</h2>
+    <div class="grid-3">
+      <div><label>Tipo</label>
+        <select id="incTipo">
+          <option>Entrega a tiempo</option><option>Entrega tarde</option><option>No entrega</option><option>Incidente</option><option>Pago realizado</option><option>Pago pendiente</option>
+        </select>
+      </div>
+      <div><label>Fecha/Hora</label><input id="incFecha" type="datetime-local"></div>
+      <div><label>Minutos retraso</label><input id="incDelay" type="number" min="0" value="0"></div>
+    </div>
+    <input id="incNotas" placeholder="Notas / evidencia textual">
+    <div class="row-2">
+      <button id="btnIncAdd">Registrar</button>
+      <button class="btn-outline" id="btnIncPDF">Informe PDF</button>
+    </div>
+    <div id="incList" class="small" style="margin-top:10px;"></div>
+  </div>
+
+</div>
+
+<!-- Modal detalle -->
+<div class="card" id="modal" style="display:none; position:fixed; inset:0; background:#0f172acc; z-index:30; align-items:center; justify-content:center;">
+  <div class="card" style="max-width:520px; width:92vw;">
+    <h3>Detalle por categoría</h3>
+    <div id="detalleLista" class="small"></div>
+    <div class="row-2" style="margin-top:10px;">
+      <button class="btn-outline" id="closeModal">Cerrar</button>
+      <button class="btn-outline" id="btnReset">Reiniciar datos</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- PIN modal -->
+<div class="card" id="pinModal" style="display:none; position:fixed; inset:0; background:#0b1220cc; align-items:center; justify-content:center; z-index:80;">
+  <div class="card" style="width:min(92vw,420px);">
+    <h3>🔒 Acceso con PIN</h3>
+    <p class="small">Protege tu información en este navegador.</p>
+    <div class="row-2">
+      <input id="pinInput" type="password" placeholder="Ingresa PIN (4-6 dígitos)">
+      <button id="pinOk">Entrar</button>
+    </div>
+    <hr class="divider" style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+    <div class="row-2">
+      <input id="pinNew" type="password" placeholder="Configurar/Actualizar PIN">
+      <button id="pinSet" class="btn-outline">Guardar PIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==========================================================
+   Utilidades base / almacenamiento / formato moneda
+   ========================================================== */
+const LS = (k,v)=> (v===undefined)? localStorage.getItem(k): localStorage.setItem(k,v);
+const JGET = (k,def)=>{ try{ return JSON.parse(localStorage.getItem(k)||JSON.stringify(def)); }catch(e){ return def; } };
+const JSET = (k,val)=> localStorage.setItem(k, JSON.stringify(val));
+const $ = (id)=> document.getElementById(id);
+
+const STORAGE_KEY   = "familyceleste_gastos_v1";
+const STORAGE_FILES = "familyceleste_files_v1";
+const MOVS_KEY      = "familyceleste_movs_v1";
+const PRES_KEY      = "familyceleste_presupuesto_v1";
+const AGENDA_KEY    = "familyceleste_agenda_v1";
+const DOCS_KEY      = "familyceleste_docs_v1";
+const PTS_KEY       = "familyceleste_points_v1";
+const GROW_KEY      = "familyceleste_growth_v1";
+const PROFILE_KEY   = "familyceleste_perfil_v1";
+const PIN_KEY       = "familyceleste_pin_v1";
+const MEMBERS_KEY   = "familyceleste_members_v1";
+const CHILDREN_KEY  = "familyceleste_children_v1";
+const INC_KEY       = "familyceleste_cust_inc_v1";
+const CHAT_KEY      = "familyceleste_chat_v1";
+const MARKET_KEY    = "familyceleste_market_v1";
+const CURRENCY_KEY  = "familyceleste_currency_v1";
+const FAMILY_KEY    = "familyceleste_familyCode_v1";
+
+/* ===== Tema (claro/oscuro) ===== */
+(function initTheme(){
+  const saved = LS("fc_theme") || "light";
+  document.documentElement.setAttribute("data-theme", saved);
+  $("themeToggle").textContent = (saved==="dark") ? "☀️" : "🌙";
+  $("themeToggle").addEventListener("click", ()=>{
+    const cur = document.documentElement.getAttribute("data-theme");
+    const next = (cur==="dark") ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    LS("fc_theme", next);
+    $("themeToggle").textContent = (next==="dark") ? "☀️" : "🌙";
+  });
+})();
+
+/* ===== Moneda ===== */
+let CURRENCY = LS(CURRENCY_KEY) || "COP";
+$("currencySelect").value = CURRENCY;
+const setMoneyLabels=()=>{ ["monedaLabel","monedaLabel2","lblMonedaM"].forEach(id=>{ if($(id)) $(id).textContent=CURRENCY;}); };
+setMoneyLabels();
+function formatMoney(v){
+  try { return new Intl.NumberFormat("es-CO",{style:"currency", currency:CURRENCY, maximumFractionDigits:0}).format(Number(v||0)); }
+  catch(_) { return `(${CURRENCY}) ${Number(v||0).toLocaleString("es-CO")}`; }
+}
+$("currencySelect").addEventListener("change", ()=>{
+  CURRENCY = $("currencySelect").value; LS(CURRENCY_KEY, CURRENCY);
+  setMoneyLabels(); actualizarTabla(); actualizarResumen(); renderMovs(); renderMaintTable();
+});
+
+/* ===== Firebase (nube opcional) ===== */
+const firebaseConfig = { /* PON AQUÍ TUS CLAVES SI USAS NUBE */
+  apiKey:"", authDomain:"", projectId:"", storageBucket:"", messagingSenderId:"", appId:""
+};
+let auth=null, db=null, storage=null;
+try {
+  const app = firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+  storage = firebase.storage();
+} catch(e){ /* ignorar si no hay config */ }
+
+let FAMILY_CODE = LS(FAMILY_KEY) || "";
+$("familyCode").value = FAMILY_CODE;
+function ensureFamilyCode(){
+  let code = $("familyCode").value.trim();
+  if (!code) { code = "FC-" + Math.random().toString(36).slice(2,8).toUpperCase(); $("familyCode").value = code; }
+  LS(FAMILY_KEY, code); FAMILY_CODE = code; return code;
+}
+$("btnCloudLogin").addEventListener("click", async ()=>{
+  try{
+    const consent = $("consentChk")?.checked ?? true;
+    if (!consent) { alert("Activa el consentimiento de datos en Perfil Legal para usar nube."); return; }
+    ensureFamilyCode();
+    if (!auth) { alert("Configura Firebase para usar la nube."); return; }
+    await auth.signInAnonymously();
+    alert("Sesión nube activa. Código familia: " + FAMILY_CODE);
+    startCloudListeners();
+  }catch(e){ alert("No fue posible iniciar sesión en la nube."); }
+});
+
+/* ===== Toast ===== */
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.opacity="0.98"; setTimeout(()=>{ t.style.opacity="0"; }, 2600); }
+
+/* ==========================================================
+   Gastos / Resumen / Movimientos
+   ========================================================== */
+let gastos = JGET(STORAGE_KEY, {});
+let movimientos = JGET(MOVS_KEY, []);
+let PRESUPUESTO = parseInt(LS(PRES_KEY) || "1000000") || 1000000;
+let chart;
+
+const gastoMeta = {
+  "Educación":{emoji:"🎒"}, "Salud":{emoji:"➕"}, "Alimentación":{emoji:"🍽️"},
+  "Ropa":{emoji:"👕"}, "Recreación":{emoji:"⚽"}, "Vivienda":{emoji:"🏠"}
+};
+function guardarEstado(){ JSET(STORAGE_KEY, gastos); }
+function guardarMovs(){ JSET(MOVS_KEY, movimientos); }
+function guardarPres(){ LS(PRES_KEY, String(PRESUPUESTO)); }
+
+function recomputeGastosFromMovs(){
+  const acc={};
+  for(const m of movimientos){ if(!m||m._deleted) continue; const cat=m.categoria, val=Number(m.valor||0); acc[cat]=(acc[cat]||0)+val; }
+  gastos=acc; guardarEstado(); actualizarGrafico(); actualizarResumen();
+}
+function agregarGasto(){
+  const categoria = $("categoria").value;
+  const valor = Number($("valor").value);
+  if (!valor) return;
+  const fechaIn = $("gFecha")?.value || "";
+  const nota = ($("gNota")?.value || "").trim();
+  const mov = { id:crypto.randomUUID(), categoria, valor, fecha: fechaIn? new Date(fechaIn).toISOString(): new Date().toISOString(), nota, _lastUpdated:Date.now() };
+  movimientos.unshift(mov); guardarMovs(); recomputeGastosFromMovs();
+  $("valor").value=""; if($("gNota"))$("gNota").value=""; if($("gFecha"))$("gFecha").value="";
+  actualizarTabla(); renderMovs(); refreshToday();
+  if (auth?.currentUser && db && FAMILY_CODE){ upsertMovCloud(mov); }
+}
+function actualizarTabla(){
+  const tbody = $("tablaGastos");
+  if(!movimientos.length){ tbody.innerHTML = `<tr><td colspan="5" class="small">Aún no hay gastos.</td></tr>`; return; }
+  tbody.innerHTML = movimientos
+    .filter(m=>!m._deleted)
+    .sort((a,b)=> new Date(b.fecha)-new Date(a.fecha))
+    .map(m=>{
+      const d=new Date(m.fecha);
+      return `<tr>
+        <td>${d.toLocaleDateString("es-CO")} ${d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}</td>
+        <td>${m.categoria}</td>
+        <td>${formatMoney(m.valor)}</td>
+        <td>${m.nota||""}</td>
+        <td>
+          <button class="btn-outline" onclick="editarMovimiento('${m.id}')">Editar</button>
+          <button class="btn-outline" onclick="eliminarMovimiento('${m.id}')">Eliminar</button>
+        </td>
+      </tr>`;
+    }).join("");
+}
+window.editarMovimiento = (id)=>{
+  const m = movimientos.find(x=>x.id===id); if(!m) return;
+  const nv = prompt("Nuevo valor:", String(m.valor ?? 0)); if(nv===null) return;
+  const parsed = Number(nv); if(!parsed || parsed<0) return alert("Valor inválido.");
+  const nc = prompt("Nueva categoría:", m.categoria||"") || m.categoria;
+  const nn = prompt("Nota (opcional):", m.nota||"") || "";
+  const nf = prompt("Fecha y hora (YYYY-MM-DD HH:mm), deja vacío para mantener:", "");
+  let fechaISO = m.fecha;
+  if(nf && nf.trim()){ const dt=new Date(nf.trim().replace(" ","T")); if(isNaN(dt)) return alert("Fecha inválida."); fechaISO = dt.toISOString(); }
+  m.valor=parsed; m.categoria=nc; m.nota=nn; m.fecha=fechaISO; m._lastUpdated=Date.now();
+  guardarMovs(); recomputeGastosFromMovs(); actualizarTabla(); renderMovs(); refreshToday();
+  if (auth?.currentUser && db && FAMILY_CODE){ upsertMovCloud(m); }
+};
+window.eliminarMovimiento = (id)=>{
+  const idx = movimientos.findIndex(x=>x.id===id); if(idx<0) return;
+  if(!confirm("¿Eliminar este movimiento?")) return;
+  movimientos.splice(idx,1); guardarMovs(); recomputeGastosFromMovs(); actualizarTabla(); renderMovs(); refreshToday();
+  if (auth?.currentUser && db && FAMILY_CODE){ deleteMovCloud(id); }
+};
+function actualizarGrafico(){
+  const ctx = $("grafico"); if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:"doughnut",
+    data:{ labels:Object.keys(gastos), datasets:[{ data:Object.values(gastos), backgroundColor:["#2F6FD6","#6FA8DC","#93C5FD","#BFDBFE","#DBEAFE","#60a5fa"] }]},
+    options:{ plugins:{ legend:{ position:"bottom" } } }
+  });
+}
+function actualizarResumen(){
+  const total = Object.values(gastos).reduce((a,b)=>a+b,0);
+  $("kpiTotal").textContent = formatMoney(total);
+  $("kpiMovs").textContent = `${Object.keys(gastos).length} categorías`;
+  const entries = Object.entries(gastos).sort((a,b)=>b[1]-a[1]);
+  const top = entries[0];
+  $("kpiTopCat").textContent = top ? top[0] : "—";
+  $("kpiTopVal").textContent = top ? formatMoney(top[1]) : "—";
+  const pct = PRESUPUESTO ? Math.min(100, Math.round((total/PRESUPUESTO)*100)) : 0;
+  $("bar").style.width = pct + "%";
+  $("barLabel").textContent = `${pct}% de ${formatMoney(PRESUPUESTO)}`;
+  if (!$("inpPresupuesto").value) $("inpPresupuesto").value = PRESUPUESTO;
+}
+$("btnGuardarPresupuesto").addEventListener("click", ()=>{
+  const v = parseInt($("inpPresupuesto").value||"0");
+  if (isNaN(v) || v<0) return alert("Ingresa un presupuesto válido.");
+  PRESUPUESTO = v; guardarPres(); actualizarResumen();
+});
+document.addEventListener("click", (e)=>{
+  const t=e.target.closest(".quick-cat"); if(!t) return;
+  const cat=t.getAttribute("data-cat"); const sel=$("categoria");
+  if (!Array.from(sel.options).map(o=>o.value).includes(cat)){ const opt=document.createElement("option"); opt.value=cat; opt.textContent=cat; sel.appendChild(opt); }
+  sel.value=cat; $("valor").focus();
+});
+$("btnVerDetalles").addEventListener("click", ()=>{
+  const items = Object.entries(gastos).sort((a,b)=>b[1]-a[1]);
+  $("detalleLista").innerHTML = items.length ? items.map(([c,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);"><span>${c}</span><strong>${formatMoney(v)}</strong></div>`).join("") : "Aún no hay gastos registrados.";
+  $("modal").style.display="flex";
+});
+$("closeModal").addEventListener("click", ()=> $("modal").style.display="none");
+$("btnReset").addEventListener("click", ()=>{
+  if(!confirm("¿Seguro que deseas reiniciar los datos?")) return;
+  gastos={}; movimientos=[]; localStorage.removeItem(STORAGE_FILES); localStorage.removeItem(DOCS_KEY);
+  guardarEstado(); guardarMovs();
+  renderFilesGrid(); $("docsList").innerHTML=""; actualizarTabla(); actualizarGrafico(); actualizarResumen(); renderMovs(); refreshToday(); renderDocs();
+  $("modal").style.display="none";
+});
+function renderMovs(){
+  const cont=$("movsList"); if(!cont) return;
+  cont.innerHTML = movimientos.length ? movimientos.slice(0,20).map(m=>{
+    const meta = gastoMeta[m.categoria]||{emoji:"💸"};
+    const d=new Date(m.fecha);
+    return `<div class="msg"><div><strong>${meta.emoji} ${m.categoria}</strong> <span class="meta">• ${d.toLocaleDateString("es-CO")} ${d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}</span></div><div>${formatMoney(m.valor)}</div></div>`;
+  }).join("") : `<div class="small">Aún no hay movimientos.</div>`;
+}
+$("btnPDF").addEventListener("click", async ()=>{
+  const { jsPDF } = window.jspdf;
+  const imgs = JGET(STORAGE_FILES, []);
+  if (!imgs.length) return alert("No hay comprobantes para exportar.");
+  const doc = new jsPDF({unit:"pt", format:"a4"}), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M=32;
+  doc.setFontSize(14); doc.text("FamilyCeleste – Comprobantes", M, M); doc.setFontSize(10); doc.text(new Date().toLocaleString("es-CO"), M, M+14);
+  let y=M+30;
+  for(let i=0;i<imgs.length;i++){
+    const dim = await getImgSize(imgs[i]); const maxW = W-M*2; const scale = Math.min(maxW/dim.w, (H - y - M)/dim.h);
+    let w=dim.w*scale, h=dim.h*scale; if (!isFinite(w)||!isFinite(h)||h<=0){ w=maxW; h=(maxW*3)/4; }
+    if (y+h>H-M){ doc.addPage(); y=M+10; }
+    doc.addImage(imgs[i], "JPEG", M, y, w, h, undefined, "FAST"); y+=h+16; doc.setFontSize(10); doc.text(`Comprobante ${i+1}`, M, y); y+=8;
+  }
+  doc.save("Comprobantes.pdf");
+});
+function getImgSize(src){ return new Promise(res=>{ const i=new Image(); i.onload=()=>res({w:i.naturalWidth||800,h:i.naturalHeight||600}); i.src=src; }); }
+
+/* ==========================================================
+   Comprobantes (selección/borrado local) + Documentos
+   ========================================================== */
+const previewEl=$("preview"), fileInput=$("fileInput");
+let REC_SELECT_MODE=false, REC_SELECTED=new Set();
+function renderFilesGrid(){
+  const imgs=JGET(STORAGE_FILES, []);
+  previewEl.innerHTML = imgs.map((src, idx)=>`
+    <div class="thumb" style="position:relative;">
+      ${src}
+      ${REC_SELECT_MODE ? `<input type="checkbox" data-idx="${idx}" ${REC_SELECTED.has(idx)?'checked':''} style="position:absolute; top:6px; left:6px; width:18px; height:18px;">` : ``}
+    </div>
+  `).join("");
+  if (REC_SELECT_MODE){
+    previewEl.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
+      chk.addEventListener('change', (e)=>{
+        const i = +e.target.getAttribute('data-idx');
+        if (e.target.checked) REC_SELECTED.add(i); else REC_SELECTED.delete(i);
+      });
+    });
+  }
+}
+function addPreviewImg(src){ const arr=JGET(STORAGE_FILES, []); arr.push(src); JSET(STORAGE_FILES, arr); renderFilesGrid(); }
+fileInput?.addEventListener("change", async ()=>{
+  const files = Array.from(fileInput.files||[]); if(!files.length) return;
+  for (const f of files){ const b64 = await fileToBase64(f); addPreviewImg(b64); }
+  fileInput.value="";
+});
+function fileToBase64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+
+$("btnRecSelectMode")?.addEventListener("click", ()=>{
+  REC_SELECT_MODE=!REC_SELECT_MODE; if(!REC_SELECT_MODE) REC_SELECTED.clear();
+  $("btnRecSelectMode").textContent = REC_SELECT_MODE ? "Salir de selección" : "Seleccionar";
+  renderFilesGrid();
+});
+$("btnRecDeleteSel")?.addEventListener("click", ()=>{
+  if (!REC_SELECT_MODE || REC_SELECTED.size===0) return alert("No hay comprobantes seleccionados.");
+  if (!confirm(`¿Borrar ${REC_SELECTED.size} comprobante(s) localmente?`)) return;
+  const imgs = JGET(STORAGE_FILES, []);
+  const next = imgs.filter((_, idx)=> !REC_SELECTED.has(idx));
+  JSET(STORAGE_FILES, next); REC_SELECTED.clear(); renderFilesGrid();
+});
+$("btnRecDeleteAll")?.addEventListener("click", ()=>{
+  const imgs = JGET(STORAGE_FILES, []);
+  if (!imgs.length) return alert("No hay comprobantes.");
+  if (!confirm("¿Borrar TODOS los comprobantes localmente?")) return;
+  JSET(STORAGE_FILES, []); REC_SELECTED.clear(); REC_SELECT_MODE=false; $("btnRecSelectMode").textContent="Seleccionar"; renderFilesGrid();
+});
+
+/* Documentos */
+const docsList=$("docsList"), docInput=$("docInput");
+let DOC_SELECT_MODE=false, DOC_SELECTED=new Set();
+function renderDocs(){
+  const docs=JGET(DOCS_KEY, []);
+  docsList.innerHTML = docs.length ? docs.map((d,i)=>`
+    <div class="row" style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; border:1px dashed var(--border); padding:8px; border-radius:10px; margin-bottom:6px; position:relative;">
+      <div><strong>${d.name}</strong> <span class="small">• ${d.type} • ${Math.round((d.size||0)/1024)} KB</span></div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        ${d.data}Descargar</a>
+        <button class="btn-outline" style="width:auto;" onclick="deleteDoc(${i})">Eliminar</button>
+      </div>
+      ${DOC_SELECT_MODE ? `<input type="checkbox" data-idx="${i}" ${DOC_SELECTED.has(i)?'checked':''} style="position:absolute; top:8px; left:8px; width:18px; height:18px;">` : ``}
+    </div>
+  `).join("") : `<div class="small">Aún no hay documentos.</div>`;
+  if (DOC_SELECT_MODE){
+    docsList.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
+      chk.addEventListener('change',(e)=>{
+        const i=+e.target.getAttribute('data-idx');
+        if (e.target.checked) DOC_SELECTED.add(i); else DOC_SELECTED.delete(i);
+      });
+    });
+  }
+}
+function deleteDoc(i){ const docs=JGET(DOCS_KEY, []); docs.splice(i,1); JSET(DOCS_KEY, docs); renderDocs(); }
+docInput?.addEventListener("change", async ()=>{
+  const files = Array.from(docInput.files||[]); if(!files.length) return;
+  const docs=JGET(DOCS_KEY, []);
+  for (const f of files){ const b64 = await fileToBase64(f); docs.push({name:f.name, type:f.type, size:f.size, data:b64, added:new Date().toISOString()}); }
+  JSET(DOCS_KEY, docs); docInput.value=""; renderDocs();
+});
+$("btnDocSelectMode")?.addEventListener("click", ()=>{
+  DOC_SELECT_MODE=!DOC_SELECT_MODE; if(!DOC_SELECT_MODE) DOC_SELECTED.clear();
+  $("btnDocSelectMode").textContent = DOC_SELECT_MODE ? "Salir de selección" : "Seleccionar";
+  renderDocs();
+});
+$("btnDocDeleteSel")?.addEventListener("click", ()=>{
+  const docs=JGET(DOCS_KEY, []);
+  if (!DOC_SELECT_MODE || DOC_SELECTED.size===0) return alert("No hay documentos seleccionados.");
+  if (!confirm(`¿Borrar ${DOC_SELECTED.size} documento(s) localmente?`)) return;
+  const next = docs.filter((_, i)=> !DOC_SELECTED.has(i));
+  JSET(DOCS_KEY, next); DOC_SELECTED.clear(); renderDocs();
+});
+$("btnDocDeleteAll")?.addEventListener("click", ()=>{
+  const docs=JGET(DOCS_KEY, []);
+  if (!docs.length) return alert("No hay documentos.");
+  if (!confirm("¿Borrar TODOS los documentos localmente?")) return;
+  JSET(DOCS_KEY, []); DOC_SELECTED.clear(); DOC_SELECT_MODE=false; $("btnDocSelectMode").textContent="Seleccionar"; renderDocs();
+});
+
+/* Nube docs/comprobantes */
+$("btnDocsCloudUp").addEventListener("click", async ()=>{
+  if (!auth?.currentUser || !db || !storage) return alert("Inicia sesión en la nube.");
+  ensureFamilyCode();
+  const docs=JGET(DOCS_KEY, []); if (!docs.length) return alert("No hay documentos locales que subir.");
+  for (const d of docs){
+    const ref = storage.ref().child(`families/${FAMILY_CODE}/docs/${d.name}`);
+    await ref.putString(d.data, "data_url"); const url=await ref.getDownloadURL();
+    await db.collection("families").doc(FAMILY_CODE).collection("docs").doc(d.name).set({name:d.name,type:d.type,size:d.size,url,added:firebase.firestore.FieldValue.serverTimestamp()});
+  }
+  alert("Documentos subidos.");
+});
+$("btnDocsCloudList").addEventListener("click", async ()=>{
+  if (!auth?.currentUser || !db) return alert("Inicia sesión en la nube.");
+  ensureFamilyCode();
+  const wrap=$("docsCloudList");
+  const snap=await db.collection("families").doc(FAMILY_CODE).collection("docs").orderBy("added","desc").get();
+  wrap.innerHTML = snap.empty ? `<div class="small">No hay documentos en la nube.</div>` : snap.docs.map(d=>{
+    const x=d.data(); return `<div class="row" style="display:flex; justify-content:space-between; border:1px dashed var(--border); padding:8px; border-radius:10px; margin-bottom:6px;"><div><strong>${x.name}</strong> <span class="small">• ${x.type||""}</span></div>${x.url}Descargar</a></div>`;
+  }).join("");
+});
+$("btnSyncComprobantes").addEventListener("click", async ()=>{
+  if (!auth?.currentUser || !db || !storage) return alert("Inicia sesión en la nube.");
+  ensureFamilyCode();
+  const imgs=JGET(STORAGE_FILES, []); if(!imgs.length) return alert("No hay comprobantes locales.");
+  let idx=0; for (const b64 of imgs){ idx++; const ref = storage.ref().child(`families/${FAMILY_CODE}/receipts/rec_${idx}.jpg`); await ref.putString(b64,"data_url"); }
+  alert("Comprobantes subidos.");
+});
+$("btnLoadComprobantes").addEventListener("click", ()=>
+  alert("Para listar comprobantes desde Storage se recomienda indexarlos en Firestore (por seguridad).")
+);
+
+/* ==========================================================
+   Agenda + indicadores de manutención (MEJORADA)
+   ========================================================== */
+let agenda = JGET(AGENDA_KEY, []);
+function saveAgenda(){ JSET(AGENDA_KEY, agenda); }
+function todayStr(d=new Date()){ const tzOff=d.getTimezoneOffset()*60000; return new Date(Date.now()-tzOff).toISOString().slice(0,10); }
+
+const catMeta = {
+  "Juzgado":{emoji:"⚖️", color:"#8b5cf6"}, "Audiencia":{emoji:"📜", color:"#7c3aed"},
+  "ICBF":{emoji:"🏛️", color:"#2563eb"}, "Mediación":{emoji:"🤝", color:"#0ea5e9"},
+  "Abogado":{emoji:"👩‍⚖️", color:"#9333ea"}, "Pediatra":{emoji:"🩺", color:"#16a34a"},
+  "Colegio":{emoji:"🏫", color:"#f59e0b"}, "Entrega/Traslado":{emoji:"🚗", color:"#ef4444"},
+  "Pagos":{emoji:"💳", color:"#0ea5e9"},
+  "Alimentación": {emoji:"🍽️", color:"var(--c-alimen)"},
+  "Medicina":     {emoji:"💊", color:"var(--c-med)"},
+  "Sueño":        {emoji:"😴", color:"var(--c-sue)"},
+  "Terapia":      {emoji:"🧩", color:"var(--c-ter)"},
+  "Recreación":   {emoji:"⚽", color:"var(--c-rec)"},
+  "__Pago__":     {emoji:"💳", color:"var(--primary)"}
+};
+
+async function addCita(){
+  const cat=$("agCat").value, f=$("agFecha").value, h=$("agHora").value;
+  const nota=($("agNota").value||"").trim(), st=$("agSticker").value||"📌";
+  const lugar=($("agLugar").value||"").trim(), people=($("agPeople").value||"").trim();
+  const prio=$("agPrio").value, rem=$("agRem").value;
+  if (!cat||!f||!h) return alert("Selecciona categoría, fecha y hora.");
+
+  const dt = new Date(`${f}T${h}:00`);
+  const item = {
+    id: crypto.randomUUID(),
+    cat, fecha: dt.toISOString(),
+    nota, sticker: st,
+    lugar, people, prio, rem, done: false,
+    _lastUpdated: Date.now()
+  };
+
+  const file = $("agAdj")?.files?.[0];
+  if (file) {
+    const toB64 = f => new Promise((res,rej)=>{const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f);});
+    item.attach = await toB64(file);
+    item.attachName = file.name;
+    $("agAdj").value="";
+  }
+
+  agenda.push(item);
+  saveAgenda();
+  $("agNota").value=""; $("agLugar").value=""; $("agPeople").value="";
+  $("agPrio").value="media"; $("agRem").value="none";
+  renderAgendaUI(); refreshToday(); renderNextAppt(); renderAgendaHoy();
+  scheduleRelativeReminder(item);
+  toast("✅ Cita agregada");
+}
+$("btnAddCita").onclick = addCita;
+
+function scheduleRelativeReminder(item){
+  if (!("Notification" in window)) return;
+  const when = new Date(item.fecha).getTime();
+  let offset = 0;
+  if (item.rem==="24h") offset = 24*60*60*1000;
+  else if (item.rem==="3h") offset = 3*60*60*1000;
+  else if (item.rem==="30m") offset = 30*60*1000;
+  else return;
+
+  const t = when - offset - Date.now();
+  if (t<=0 || t> 7*24*60*60*1000) return;
+  setTimeout(()=>{
+    if (Notification.permission==="granted"){
+      const meta = catMeta[item.cat]||{emoji:"📌"};
+      new Notification(`Recordatorio: ${item.cat}`, { body: `${meta.emoji} ${item.nota||"Sin notas"} • ${new Date(item.fecha).toLocaleString("es-CO")}` });
+    }
+    toast(`🔔 Recordatorio: ${item.cat}`);
+  }, t);
+}
+
+function renderNextAppt(){
+  const box = $("nextAppt");
+  const now = new Date();
+  const upcoming = agenda
+    .map(a=>({...a,d:new Date(a.fecha)}))
+    .filter(a=>a.d>=now && !a.done)
+    .sort((a,b)=>a.d-b.d)[0];
+
+  if (!upcoming){ box.innerHTML="Sin próxima cita"; return; }
+
+  const meta = catMeta[upcoming.cat]||{emoji:"📌"};
+  const diffMs = upcoming.d - now;
+  const hrs = Math.floor(diffMs/3600000);
+  const mins = Math.floor((diffMs%3600000)/60000);
+  const dd = upcoming.d.toLocaleDateString("es-CO");
+  const hh = upcoming.d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+
+  box.innerHTML = `
+    <div><strong>${meta.emoji} ${upcoming.cat}</strong> — ${dd} ${hh}</div>
+    <div class="small">${upcoming.lugar?`📍 ${upcoming.lugar} • `:""}${upcoming.people?`👥 ${upcoming.people} • `:""}Prioridad: ${upcoming.prio.toUpperCase()}</div>
+    <div class="small">Faltan: <strong>${hrs}h ${mins}m</strong> • ${upcoming.nota||"Sin notas"}</div>
+    <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
+      <button class="btn-outline" onclick="agMarkDone('${upcoming.id}')">Marcar realizada</button>
+      <button class="btn-outline" onclick="agEdit('${upcoming.id}')">Editar</button>
+      <button class="btn-outline" onclick="agDel('${upcoming.id}')">Eliminar</button>
+      <button class="btn-outline" onclick="agICS('${upcoming.id}')">Agregar al calendario (.ics)</button>
+      ${upcoming.attach? `${upcoming.attach}Adjunto</a>`:""}
+    </div>
+  `;
+}
+window.agMarkDone = (id)=>{
+  const a = agenda.find(x=>x.id===id); if(!a) return;
+  a.done = true; a._lastUpdated = Date.now();
+  saveAgenda(); renderNextAppt(); renderAgendaHoy(); renderAgendaUI(); refreshToday();
+};
+
+function renderAgendaHoy(){
+  const wrap = $("agendaHoy");
+  const today = new Date().toISOString().slice(0,10);
+  const items = agenda.map(a=>({...a,d:new Date(a.fecha)}))
+    .filter(a=> a.d.toISOString().slice(0,10)===today)
+    .sort((a,b)=>a.d-b.d);
+
+  wrap.innerHTML = items.length ? items.map(a=>{
+    const meta = catMeta[a.cat]||{emoji:"📌"};
+    const hh = a.d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+    return `
+      <div class="msg">
+        <div><strong>${meta.emoji} ${a.cat}</strong> <span class="meta">• ${hh}</span></div>
+        <div class="small">${a.lugar?`📍 ${a.lugar} • `:""}${a.people?`👥 ${a.people} • `:""}Prio: ${a.prio.toUpperCase()}</div>
+        ${a.nota? `<div class="small">${a.nota}</div>`:""}
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-outline" onclick="agEdit('${a.id}')">Editar</button>
+          <button class="btn-outline" onclick="agDel('${a.id}')">Eliminar</button>
+          <button class="btn-outline" onclick="agICS('${a.id}')">.ics</button>
+          ${a.attach? `${a.attach}Adjunto</a>`:""}
+        </div>
+      </div>`;
+  }).join("") : `<div class="small">Sin citas para hoy.</div>`;
+}
+
+function agICS(id){
+  const a = agenda.find(x=>x.id===id); if(!a) return;
+  const dt = new Date(a.fecha);
+  const pad = n=>String(n).padStart(2,"0");
+  const toICS = (d)=>`${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
+  const dtStart = toICS(dt);
+  const dtEnd = toICS(new Date(dt.getTime()+60*60*1000)); // 1 hora
+  const summary = `${a.cat}${a.lugar?` - ${a.lugar}`:""}`;
+  const description = `${a.nota||""}${a.people?`\nParticipantes: ${a.people}`:""}`;
+
+  const ics = [
+    "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//FamilyCeleste//ES",
+    "BEGIN:VEVENT",
+    `UID:${a.id}`,
+    `DTSTAMP:${toICS(new Date())}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description.replace(/\n/g,"\\n")}`,
+    "END:VEVENT","END:VCALENDAR"
+  ].join("\r\n");
+
+  const blob = new Blob([ics],{type:"text/calendar;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const aEl = document.createElement("a");
+  aEl.href = url; aEl.download = `cita_${a.cat}_${dt.toISOString().slice(0,16).replace(/[:T]/g,"")}.ics`;
+  document.body.appendChild(aEl); aEl.click(); aEl.remove(); URL.revokeObjectURL(url);
+}
+
+/* Editar / Eliminar existentes (mantiene compatibilidad) */
+window.agEdit=id=>{
+  const a=agenda.find(x=>x.id===id);
+  if(!a)return;
+  const nf=prompt("Nuevo día (YYYY-MM-DD):",a.fecha.slice(0,10));
+  const nh=prompt("Nueva hora (HH:MM):",a.fecha.slice(11,16));
+  if(nf && nh){ a.fecha=new Date(`${nf}T${nh}:00`).toISOString(); }
+  a.nota=prompt("Nueva nota:",a.nota||"")||a.nota;
+  a.lugar=prompt("Lugar:",a.lugar||"")||a.lugar;
+  a.people=prompt("Participantes:",a.people||"")||a.people;
+  a._lastUpdated=Date.now();
+  saveAgenda(); renderAgendaUI(); refreshToday(); renderNextAppt(); renderAgendaHoy();
+};
+window.agDel=id=>{
+  if(!confirm("¿Eliminar cita?"))return;
+  agenda=agenda.filter(x=>x.id!==id);
+  saveAgenda(); renderAgendaUI(); refreshToday(); renderNextAppt(); renderAgendaHoy();
+};
+
+/* Mini calendario + próximas 24h */
+let calCursor=new Date();
+function groupByDate(arr){ const map={}; for (const a of arr){ const d=a.fecha.slice(0,10); map[d]=map[d]||[]; map[d].push(a); } return map; }
+function renderMiniCalendar(){
+  const y=calCursor.getFullYear(), m=calCursor.getMonth(), first=new Date(y,m,1);
+  const startIndex=(first.getDay()+6)%7, daysInMonth=new Date(y,m+1,0).getDate();
+  const totalCells=Math.ceil((startIndex+daysInMonth)/7)*7;
+  $("mesLeyenda").textContent = first.toLocaleDateString("es-CO",{month:"long",year:"numeric"});
+  const cal=$("calGrid"); cal.innerHTML="";
+  const all = agenda.concat(maintToAgendaEvents());
+  const byDate = groupByDate(all);
+  for (let i=0;i<totalCells;i++){
+    const dayNum = i - startIndex + 1;
+    const btn=document.createElement("button");
+    if (dayNum<1 || dayNum>daysInMonth){ btn.style.opacity=".6"; btn.style.cursor="default"; cal.appendChild(btn); continue; }
+    const dStr=new Date(y,m,dayNum).toISOString().slice(0,10);
+    btn.innerHTML = `<span class="cal-daynum">${dayNum}</span><div class="day-badges">${(byDate[dStr]||[]).slice(0,3).map(x=> x.cat==="__Pago__" ? "💳" : (x.sticker||"📌")).join(" ")}</div>`;
+    if (dStr===todayStr()) btn.style.background="#F1F5FF22";
+    btn.addEventListener("click", ()=>{ $("agFecha").value=dStr; $("agHora").focus(); toast("📌 Fecha seleccionada: " + new Date(dStr).toLocaleDateString("es-CO")); });
+    cal.appendChild(btn);
+  }
+}
+$("prevMes").addEventListener("click", ()=>{ calCursor.setMonth(calCursor.getMonth()-1); renderMiniCalendar(); });
+$("nextMes").addEventListener("click", ()=>{ calCursor.setMonth(calCursor.getMonth()+1); renderMiniCalendar(); });
+
+function renderNext24h(){
+  const cont=$("agendaList"); const now=new Date(); const in24=new Date(now.getTime()+24*60*60*1000);
+  const items = agenda.map(a=>({...a,d:new Date(a.fecha)})).filter(a=> a.d>=now && a.d<=in24).sort((a,b)=>a.d-b.d);
+  cont.innerHTML = items.length ? items.map(a=>{
+    const meta=catMeta[a.cat]||{emoji:"📌"}; const hh=a.d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+    return `<div class="msg"><div><strong>${meta.emoji} ${a.cat}</strong> <span class="meta">• ${hh}</span></div><div class="small">${a.nota||a.d.toLocaleDateString("es-CO")}</div></div>`;
+  }).join("") : `<div class="small">No hay citas en las próximas 24 horas.</div>`;
+}
+function renderAgendaUI(){ renderMiniCalendar(); renderNext24h(); renderNextAppt(); renderAgendaHoy(); }
+
+/* Dashboard hoy */
+function refreshToday(){
+  const todayKey=(d)=> d.toISOString().slice(0,10); const now=new Date(); const today=todayKey(now);
+  const citas = agenda.map(a=>({...a,d:new Date(a.fecha)})).filter(a=> a.d.toISOString().slice(0,10)===today && a.d>=now).sort((a,b)=>a.d-b.d);
+  $("tileCitas").textContent = citas.length;
+  $("tileCitasTxt").textContent = citas[0]? `${citas[0].cat} a las ${citas[0].d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}` : "Sin citas";
+  const movsHoy = movimientos.filter(m=> new Date(m.fecha).toISOString().slice(0,10)===today);
+  const totalHoy = movsHoy.reduce((a,b)=> a+(b.valor||0), 0);
+  $("tileGastoHoy").textContent = formatMoney(totalHoy);
+  $("tileMovsHoy").textContent = `${movsHoy.length} movimientos`;
+  renderMaintAlerts();
+}
+
+/* ==========================================================
+   Manutención (mensual + IPC + alertas + calendario)
+   ========================================================== */
+const MAINT_KEY_LOCAL="familyceleste_maint_v1";
+let MAINT = JGET(MAINT_KEY_LOCAL, { amount:0, payer:"", dueDay:30, ipcRate:9.3, ipcDate:"", schedule:[] });
+
+function saveMaint(){ JSET(MAINT_KEY_LOCAL, MAINT); }
+function applyAnnualIPCIfNeeded(){
+  if (!MAINT.ipcDate || !MAINT.ipcRate || !MAINT.amount) return;
+  const now=new Date(); const ipcd = new Date(MAINT.ipcDate);
+  const thisYear = new Date(now.getFullYear(), ipcd.getMonth(), ipcd.getDate());
+  const lastAppliedYear = parseInt(LS("fc_ipc_last_applied")||"0");
+  if (now>=thisYear && lastAppliedYear < now.getFullYear()){
+    MAINT.amount = Math.round(MAINT.amount * (1 + (Number(MAINT.ipcRate)/100)));
+    saveMaint(); LS("fc_ipc_last_applied", String(now.getFullYear()));
+    toast(`📈 IPC aplicado ${MAINT.ipcRate}% – nuevo monto: ${formatMoney(MAINT.amount)}`);
+    renderMaintTable(); renderMiniCalendar(); renderMaintAlerts();
+  }
+}
+function renderMaintTable(){
+  $("lblMonedaM").textContent=CURRENCY;
+  $("maintStatusTag").textContent = "Estado: " + (MAINT.amount? "Configurado" : "Sin configurar");
+  const tb=$("maintTable").querySelector("tbody");
+  if (!MAINT.schedule?.length){ tb.innerHTML=`<tr><td colspan="5" class="small">Genera el calendario para ver los próximos pagos.</td></tr>`; return; }
+  tb.innerHTML = MAINT.schedule.map((r,idx)=>{
+    const due=new Date(r.dueISO); const isLate = (r.status!=="pagado") && (due < new Date());
+    const st = r.status==="pagado" ? "✅ Pagado" : (isLate ? "⛔ Vencido" : "⏳ Pendiente");
+    return `<tr>
+      <td>${r.month}</td><td>${due.toLocaleDateString("es-CO")}</td><td>${formatMoney(r.amount)}</td><td>${st}</td>
+      <td>
+        <button class="btn-outline" onclick="maintEdit(${idx})">Editar</button>
+        <button class="btn-outline" onclick="maintDel(${idx})">Eliminar</button>
+        ${r.status!=="pagado" ? `<button class="btn-outline" onclick="markMaintPaid(${idx})">Marcar pagado</button>` : `<span class="small">Pagado ${new Date(r.paidAt).toLocaleDateString("es-CO")}</span>`}
+      </td>
+    </tr>`;
+  }).join("");
+}
+function markMaintPaid(i){ const r=MAINT.schedule[i]; if (!r) return; r.status="pagado"; r.paidAt=new Date().toISOString(); r._lastUpdated=Date.now(); saveMaint(); renderMaintTable(); renderMaintAlerts(); renderMiniCalendar(); }
+window.maintEdit = (i)=>{
+  const r=MAINT.schedule[i]; if(!r) return;
+  const nv=+prompt("Nuevo monto:",r.amount)||r.amount;
+  const nf=prompt("Nuevo mes (YYYY-MM):",r.month)||r.month;
+  const base=new Date(nf+"-01T00:00:00");
+  r.amount=nv; r.month=nf; r.dueISO=new Date(base.getFullYear(), base.getMonth(), MAINT.dueDay||30).toISOString(); r._lastUpdated=Date.now();
+  saveMaint(); renderMaintTable(); renderMaintAlerts(); renderMiniCalendar();
+};
+window.maintDel = (i)=>{ if(!confirm("¿Eliminar este mes del calendario?")) return; MAINT.schedule.splice(i,1); saveMaint(); renderMaintTable(); renderMaintAlerts(); renderMiniCalendar(); };
+$("btnSaveMaint").addEventListener("click", ()=>{
+  const amt=parseInt($("payAmount").value||"0"); const payer=($("payPayer").value||"").trim(); const dueDay=parseInt($("payDueDay").value||"30");
+  const ipc = parseFloat($("ipcRate").value||"0"); const ipcDate = $("ipcDate").value;
+  MAINT.amount=amt; MAINT.payer=payer; MAINT.dueDay=dueDay; MAINT.ipcRate=ipc; MAINT.ipcDate=ipcDate;
+  saveMaint(); toast("💾 Parámetros de manutención guardados."); applyAnnualIPCIfNeeded(); renderMaintTable(); renderMiniCalendar(); renderMaintAlerts();
+});
+$("btnGenSchedule").addEventListener("click", ()=>{
+  const from=$("maintFrom").value; if (!from) return alert("Selecciona el mes de inicio.");
+  if (!MAINT.amount || !MAINT.dueDay) return alert("Completa monto y día de vencimiento.");
+  const [Y,M]=from.split("-").map(Number);
+  const list=[]; for (let i=0;i<12;i++){ const d=new Date(Y, (M-1)+i, MAINT.dueDay);
+    list.push({ month:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`, dueISO:d.toISOString(), amount:MAINT.amount, status:"pendiente", _lastUpdated:Date.now() });
+  }
+  MAINT.schedule=list; saveMaint(); renderMaintTable(); renderMiniCalendar(); renderMaintAlerts();
+});
+function renderMaintAlerts(){
+  const box=$("maintAlerts"); if (!MAINT.schedule?.length) { box.innerHTML=""; return; }
+  const now=new Date();
+  const pending = MAINT.schedule.filter(r=> r.status!=="pagado");
+  const overdue = pending.filter(r=> new Date(r.dueISO) < now);
+  const dueSoon = pending.filter(r=>{ const d=new Date(r.dueISO); const diff=(d-now)/(1000*60*60*24); return diff>=0 && diff<=3; });
+  let html="";
+  if (overdue.length) html += `<div class="err">⛔ Hay ${overdue.length} pago(s) <strong>vencido(s)</strong>. Paga: <strong>${MAINT.payer||"—"}</strong></div>`;
+  if (dueSoon.length) html += `<div class="warn" style="margin-top:6px;">⚠️ Hay ${dueSoon.length} pago(s) que vencen en ≤ 3 días.</div>`;
+  if (!html && MAINT.amount) html = `<div class="ok">💳 Próximo pago de manutención por ${formatMoney(MAINT.amount)}. Paga: <strong>${MAINT.payer||"—"}</strong>.</div>`;
+  box.innerHTML = html;
+}
+$("btnMaintDeleteAll")?.addEventListener("click", ()=>{
+  if (!MAINT?.schedule?.length) return alert("No hay calendario de pagos.");
+  if (!confirm("¿Borrar TODO el calendario de manutención localmente?")) return;
+  MAINT.schedule = []; saveMaint(); renderMaintTable(); renderMaintAlerts(); renderMiniCalendar(); refreshToday();
+});
+function maintToAgendaEvents(){ if (!MAINT.schedule?.length) return []; return MAINT.schedule.map(r=>({ id:`maint-${r.month}`, cat:"__Pago__", fecha:r.dueISO, nota:`Pago manutención ${formatMoney(r.amount)} (${r.status})`, sticker:"💳" })); }
+
+/* ==========================================================
+   Chat (local + escucha nube)
+   ========================================================== */
+let CHAT = JGET(CHAT_KEY, []);
+function renderChat(){ $("chatList").innerHTML = CHAT.slice(-200).map(m=>`<div class="msg"><div><strong>${m.name||"Padre/Madre"}</strong> <span class="meta">• ${new Date(m.ts).toLocaleString("es-CO")}</span></div><div>${m.text}</div></div>`).join("") || `<div class="small">Aún no hay mensajes.</div>`; }
+function saveChat(){ JSET(CHAT_KEY, CHAT); }
+$("btnChatJoin").addEventListener("click", ()=>{ const name=($("chatName").value||"").trim(); if (!name) return alert("Escribe tu nombre/rol."); LS("fc_chat_name", name); toast("Nombre establecido: " + name); });
+$("chatSend").addEventListener("click", async ()=>{
+  const text=($("chatInput").value||"").trim(); if (!text) return;
+  const name=LS("fc_chat_name") || "Padre/Madre"; const msg={ id:crypto.randomUUID(), name, text, ts:Date.now(), family:FAMILY_CODE };
+  CHAT.push(msg); saveChat(); renderChat(); $("chatInput").value="";
+  if (auth?.currentUser && db && FAMILY_CODE){ await db.collection("families").doc(FAMILY_CODE).collection("chat").doc(msg.id).set(msg); }
+});
+$("chatClear").addEventListener("click", ()=>{ if (!confirm("¿Limpiar chat local?")) return; CHAT=[]; saveChat(); renderChat(); });
+
+/* ====== Nube gastos (CRUD) ====== */
+function cloudReady(){ return auth?.currentUser && db && FAMILY_CODE; }
+async function upsertMovCloud(m){ if(!cloudReady()) return; ensureFamilyCode(); await db.collection("families").doc(FAMILY_CODE).collection("movimientos").doc(m.id).set(m,{merge:true}); }
+async function deleteMovCloud(id){ if(!cloudReady()) return; ensureFamilyCode(); await db.collection("families").doc(FAMILY_CODE).collection("movimientos").doc(id).delete(); }
+function listenCloudMovs(){
+  if(!db) return; ensureFamilyCode();
+  db.collection("families").doc(FAMILY_CODE).collection("movimientos").onSnapshot(snap=>{
+    let changed=false;
+    snap.docChanges().forEach(ch=>{
+      if(ch.type==="removed"){ const id=ch.doc.id; const i=movimientos.findIndex(x=>x.id===id); if(i>-1){ movimientos.splice(i,1); changed=true; } }
+      else { const d={id:ch.doc.id, ...ch.doc.data()}; const loc=movimientos.find(x=>x.id===d.id);
+        if(!loc){ movimientos.unshift(d); changed=true; } else if((d._lastUpdated||0)>(loc._lastUpdated||0)){ Object.assign(loc,d); changed=true; } }
+    });
+    if(changed){ guardarMovs(); recomputeGastosFromMovs(); actualizarTabla(); renderMovs(); refreshToday(); }
+  });
+}
+$("btnSyncMovsUp")?.addEventListener("click", async ()=>{
+  if(!cloudReady()) return alert("Inicia sesión en la nube.");
+  ensureFamilyCode();
+  for(const m of movimientos){ await upsertMovCloud(m); }
+  alert("Gastos sincronizados a la nube.");
+});
+$("btnSyncMovsDown")?.addEventListener("click", async ()=>{
+  if(!cloudReady()) return alert("Inicia sesión en la nube.");
+  ensureFamilyCode();
+  const qs=await db.collection("families").doc(FAMILY_CODE).collection("movimientos").orderBy("_lastUpdated","desc").get();
+  movimientos = qs.docs.map(d=>({id:d.id, ...d.data()}));
+  guardarMovs(); recomputeGastosFromMovs(); actualizarTabla(); renderMovs(); refreshToday();
+  alert("Gastos cargados desde la nube.");
+});
+
+/* ====== Listeners nube ====== */
+function startCloudListeners(){
+  if (!db) return; ensureFamilyCode();
+  // Chat
+  db.collection("families").doc(FAMILY_CODE).collection("chat").orderBy("ts","asc").onSnapshot(snap=>{
+    let changed=false;
+    snap.docChanges().forEach(ch=>{
+      if (ch.type==="added"){ const msg=ch.doc.data(); if (!CHAT.find(x=>x.id===msg.id)){ CHAT.push(msg); changed=true; } }
+    });
+    if (changed){ saveChat(); renderChat(); }
+  });
+  // Movimientos
+  listenCloudMovs();
+}
+
+/* ==========================================================
+   Mercado / Trueque
+   ========================================================== */
+let MK = JGET(MARKET_KEY, []), MK_IMG_TMP=[];
+function mkSave(){ JSET(MARKET_KEY, MK); }
+function mkRender(){
+  const q=($("mkSearch")?.value||"").toLowerCase(), f=$("mkFilter")?.value;
+  const cont=$("mkList"); if (!cont) return;
+  const items = MK.filter(x=>{ const okF = (!f || x.type===f); const okQ = (x.title||"").toLowerCase().includes(q) || (x.desc||"").toLowerCase().includes(q); return okF && okQ; });
+  cont.innerHTML = items.length ? items.map(x=>{
+    const ribbon = /leche|fórmula|formula|pañal|pañales|panales|comida bebé|bebé/i.test(x.title+" "+(x.desc||""))
+      ? `<div class="ribbon">${(x.type==="venta"?"OFERTA":"TRUEQUE")} ${/leche|fórmula|formula/i.test(x.title+" "+(x.desc||""))? "LECHE" : "BEBÉS"}</div>` : "";
+    const imgs = (x.images||[]).slice(0,3).map(src=>`${src}`).join("");
+    return `<div style="position:relative;border:1px dashed var(--border);border-radius:12px;padding:10px;margin-bottom:10px;">
+      ${ribbon}
+      <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
+        <div>
+          <div><strong>${x.title}</strong> <span class="small">• ${x.type}</span></div>
+          <div class="small">${x.desc||""}</div>
+          <div class="preview" style="margin-top:6px; gap:6px; grid-template-columns:repeat(3,72px);">${imgs}</div>
+          <div class="small" style="margin-top:6px;">Estado: <strong>${x.status||"disponible"}</strong></div>
+        </div>
+        <div>
+          <button class="btn-outline" onclick="mkReservar('${x.id}')" ${(x.status!=="disponible")?'disabled':''}>Reservar</button>
+          <button class="btn-outline" style="margin-left:6px;" onclick="mkEliminar('${x.id}')">Eliminar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("") : `<div class="small">No hay publicaciones.</div>`;
+}
+window.mkReservar=(id)=>{ const it=MK.find(i=>i.id===id); if(!it) return; it.status="reservado"; mkSave(); mkRender(); };
+window.mkEliminar=(id)=>{ MK = MK.filter(i=>i.id!==id); mkSave(); mkRender(); };
+$("mkImg")?.addEventListener("change", async (e)=>{
+  const f=e.target.files[0]; if(!f) return; const b64=await fileToBase64(f); MK_IMG_TMP.push(b64);
+  const img=document.createElement("img"); img.src=b64; img.style.cssText="width:72px;height:72px;border-radius:10px;border:1px dashed var(--border);object-fit:cover;"; $("mkPreview").appendChild(img);
+});
+$("mkPublish").addEventListener("click", ()=>{
+  const title=$("mkTitle").value.trim(), type=$("mkType").value, desc=$("mkDesc").value.trim();
+  if (!title) return alert("Ingresa un título.");
+  MK.unshift({ id:crypto.randomUUID(), title, type, desc, images:MK_IMG_TMP.slice(), status:"disponible", createdAt:new Date().toISOString(), family:FAMILY_CODE||"local" });
+  $("mkTitle").value=""; $("mkDesc").value=""; MK_IMG_TMP=[]; $("mkPreview").innerHTML=""; mkSave(); mkRender();
+});
+$("mkSearch").addEventListener("input", mkRender); $("mkFilter").addEventListener("change", mkRender);
+
+/* ==========================================================
+   Cupones / Bonos (MEJORADO)
+   ========================================================== */
+let CP = [
+  // ——— Enfoque bebé: incluye tu solicitud
+  {
+    id:"c-leche30",
+    partner:"BebéFeliz",
+    cat:"bebes",
+    title:"30% de descuento en leche para bebé",
+    costPoints:420,
+    validTo:"2026-09-30",
+    terms:"Válido en referencias seleccionadas. Stock limitado.",
+    highlight:"LECHE",
+    promo:"-30%"
+  },
+  {
+    id:"c-panales2x1",
+    partner:"Droguería Salud+",
+    cat:"drogueria",
+    title:"2x1 en pañales etapa 2 y 3",
+    costPoints:350,
+    validTo:"2026-08-31",
+    terms:"Aplican marcas seleccionadas.",
+    highlight:"BEBÉS",
+    promo:"2x1"
+  },
+  // ——— Anteriores + otros
+  { id:"c1", partner:"Droguería Salud+", cat:"drogueria", title:"10% en pañales", costPoints:200, validTo:"2026-12-31", terms:"Cupón único.", highlight:"BEBÉS", promo:"-10%" },
+  { id:"c2", partner:"AhorraMas", cat:"supermercado", title:"$15.000 mercado (incluye leche)", costPoints:500, validTo:"2026-06-30", terms:"Compra mínima $100.000", highlight:"MERCADO", promo:"$15k" },
+  { id:"c3", partner:"BebéFeliz", cat:"bebes", title:"2x1 baberos", costPoints:150, validTo:"2026-08-31", terms:"Ref. seleccionadas", highlight:"BEBÉS", promo:"2x1" },
+  { id:"c4", partner:"Vida Sana", cat:"salud", title:"10% vitaminas", costPoints:180, validTo:"2026-07-31", terms:"Una vez por familia", highlight:"SALUD", promo:"-10%" },
+  { id:"c-bono20", partner:"Mercalisto", cat:"supermercado", title:"Bono $20.000 en compras de hogar", costPoints:520, validTo:"2026-10-15", terms:"Compra mínima $120.000", highlight:"HOGAR", promo:"+$20k" },
+  { id:"c-utiles15", partner:"EduShop", cat:"educacion", title:"15% en útiles escolares", costPoints:260, validTo:"2026-07-20", terms:"No acumulable con otras promos", highlight:"EDU", promo:"-15%" }
+];
+
+let points = parseInt(LS(PTS_KEY) || "0") || 0;
+
+function cpFormatDate(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-CO", { year:"numeric", month:"2-digit", day:"2-digit" });
+  } catch { return iso; }
+}
+
+function cpMakeRibbon(x){
+  if (!x.highlight && !x.promo) return "";
+  const label = [x.promo, x.highlight].filter(Boolean).join(" ");
+  return `<div class="ribbon ${/leche|bebé|bebes|bebés|pañal|pañales/i.test(x.title) ? 'orange' : ''}">${label}</div>`;
+}
+
+function cpIsExpired(x) {
+  const now = new Date();
+  const end = new Date(x.validTo + "T23:59:59");
+  return now > end;
+}
+
+function cpGenerateCode(couponId) {
+  return `FC-${couponId}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+}
+
+function cpRenderPoints(){
+  const el = $("cpPointsTag");
+  if (el) el.textContent = `Puntos: ${points.toLocaleString("es-CO")}`;
+}
+
+function cpRender() {
+  const q = ($("cpSearch")?.value || "").toLowerCase();
+  const f = $("cpFilter")?.value;
+  const cont = $("cpList");
+
+  const items = CP.filter(x => {
+    const okF = (!f || x.cat === f);
+    const okQ = x.title.toLowerCase().includes(q) || x.partner.toLowerCase().includes(q);
+    return okF && okQ;
+  }).sort((a,b) => (cpIsExpired(a) - cpIsExpired(b))); // vigentes primero
+
+  if (!items.length) {
+    cont.innerHTML = `<div class="small">No hay cupones.</div>`;
+    cpRenderPoints();
+    return;
+  }
+
+  cont.innerHTML = items.map(x => {
+    const expired = cpIsExpired(x);
+    const ribbon = cpMakeRibbon(x);
+    const catLabel = {
+      supermercado: "🛒 Supermercado",
+      drogueria: "💊 Droguería",
+      bebes: "🍼 Productos bebé",
+      salud: "🩺 Salud y bienestar",
+      hogar: "🏠 Hogar",
+      educacion: "🎒 Educación"
+    }[x.cat] || "🏷️ Varios";
+
+    return `
+      <div class="coupon ${expired ? "expired" : ""}">
+        ${ribbon}
+        <div class="coupon-head">
+          <span class="coupon-badge">${catLabel}</span>
+          <div class="coupon-title">${x.title}</div>
+        </div>
+        <div class="coupon-body">
+          <div class="coupon-partner">En: <strong>${x.partner}</strong></div>
+          <div class="coupon-meta">Vence: <strong>${cpFormatDate(x.validTo)}</strong> • Costo: <span class="label-pts">${x.costPoints} pts</span></div>
+          <div class="coupon-terms">${x.terms}</div>
+        </div>
+        <div class="coupon-footer">
+          <div class="coupon-hint">${expired ? "Cupón vencido" : "Código se generará al canjear"}</div>
+          <button ${expired || points < x.costPoints ? 'disabled' : ''} onclick="cpRedeem('${x.id}')">Canjear</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  cpRenderPoints();
+}
+
+window.cpRedeem = (id) => {
+  const c = CP.find(x => x.id === id);
+  if (!c) return;
+  if (cpIsExpired(c)) return alert("Este cupón ya venció.");
+  if (points < c.costPoints) return alert("No tienes puntos suficientes.");
+
+  points -= c.costPoints;
+  LS(PTS_KEY, String(points));
+
+  const code = cpGenerateCode(c.id);
+  alert(`🎉 Canje exitoso\nPartner: ${c.partner}\nCupón: ${c.title}\n\nCódigo:\n${code}`);
+
+  cpRender();
+};
+
+// Eventos de búsqueda/filtro
+$("cpSearch").addEventListener("input", cpRender);
+$("cpFilter").addEventListener("change", cpRender);
+
+/* ==========================================================
+   Crecimiento / Rutinas
+   ========================================================== */
+let growth = JGET(GROW_KEY, []), chartAltura, chartPeso;
+function saveGrowth(){ JSET(GROW_KEY, growth); }
+$("btnAddGrowth").addEventListener("click", ()=>{
+  const altura=parseFloat($("gAltura").value), peso=parseFloat($("gPeso").value), animo=$("gAnimo").value, logro=($("gLogro").value||"").trim();
+  if (isNaN(altura) && isNaN(peso) && !logro) return alert("Registra al menos altura, peso o un logro.");
+  growth.push({fecha:new Date().toISOString(), altura:isNaN(altura)?null:altura, peso:isNaN(peso)?null:peso, animo, logro}); saveGrowth(); renderGrowth();
+  $("gAltura").value=""; $("gPeso").value=""; $("gLogro").value="";
+});
+function renderGrowth(){
+  const gl=$("growthList");
+  gl.innerHTML = growth.length ? growth.slice(-10).reverse().map(g=>{
+    const d=new Date(g.fecha); return `<div>📅 ${d.toLocaleDateString("es-CO")} – ${g.animo} ${g.altura?`• ${g.altura} cm`:``} ${g.peso?`• ${g.peso} kg`:``} ${g.logro?`• ${g.logro}`:``}</div>`;
+  }).join("") : `<div class="small">Sin registros.</div>`;
+  const dates=growth.map(g=> new Date(g.fecha).toLocaleDateString("es-CO")), alturas=growth.map(g=>g.altura), pesos=growth.map(g=>g.peso);
+  const ca=$("chartAltura").getContext("2d"); if (chartAltura) chartAltura.destroy();
+  chartAltura=new Chart(ca,{type:"line",data:{labels:dates,datasets:[{label:"Altura (cm)",data:alturas,borderColor:"#2563eb",backgroundColor:"#93c5fd55",tension:.3,spanGaps:true}]},options:{plugins:{legend:{display:true}},scales:{y:{beginAtZero:false}}}});
+  const cp=$("chartPeso").getContext("2d"); if (chartPeso) chartPeso.destroy();
+  chartPeso=new Chart(cp,{type:"line",data:{labels:dates,datasets:[{label:"Peso (kg)",data:pesos,borderColor:"#10b981",backgroundColor:"#a7f3d055",tension:.3,spanGaps:true}]},options:{plugins:{legend:{display:true}},scales:{y:{beginAtZero:false}}}});
+}
+
+/* ==========================================================
+   Miembros / Hijos
+   ========================================================== */
+let MEMBERS = JGET(MEMBERS_KEY, []), CHILDREN = JGET(CHILDREN_KEY, []);
+function renderMembers(){
+  $("membersList").innerHTML = MEMBERS.length ? MEMBERS.map((m,i)=>`
+    <div class="row" style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; border:1px dashed var(--border); padding:8px; border-radius:10px; margin-bottom:6px;">
+      <div><strong>${m.rol}</strong>: ${m.nombre} <span class="small">• ${m.doc||""} ${m.tel?`• ${m.tel}`:""} ${m.mail?`• ${m.mail}`:""}</span></div>
+      <button class="btn-outline" onclick="delMember(${i})">Eliminar</button>
+    </div>
+  `).join("") : `<div class="small">Sin miembros adicionales.</div>`;
+}
+function renderChildren(){
+  $("childrenList").innerHTML = CHILDREN.length ? CHILDREN.map((c,i)=>`
+    <div class="row" style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; border:1px dashed var(--border); padding:8px; border-radius:10px; margin-bottom:6px;">
+      <div><strong>${c.nombre}</strong> <span class="small">• ${c.doc||""} ${c.nac?`• ${c.nac}`:""} ${c.sangre?`• ${c.sangre}`:""} ${c.alergias?`• ${c.alergias}`:""} ${c.school?`• ${c.school}`:""}</span></div>
+      <button class="btn-outline" onclick="delChild(${i})">Eliminar</button>
+    </div>
+  `).join("") : `<div class="small">Sin hijos adicionales.</div>`;
+}
+window.delMember=(i)=>{ MEMBERS.splice(i,1); JSET(MEMBERS_KEY, MEMBERS); renderMembers(); };
+window.delChild=(i)=>{ CHILDREN.splice(i,1); JSET(CHILDREN_KEY, CHILDREN); renderChildren(); };
+$("btnAddMember").addEventListener("click", ()=>{
+  const obj={ id:crypto.randomUUID(), rol:$("mbRol").value, nombre:$("mbNombre").value.trim(), doc:$("mbDoc").value.trim(), tel:$("mbTel").value.trim(), mail:$("mbMail").value.trim() };
+  if (!obj.nombre) return alert("Nombre requerido."); MEMBERS.push(obj); JSET(MEMBERS_KEY, MEMBERS); renderMembers();
+  ["mbNombre","mbDoc","mbTel","mbMail"].forEach(i=> $(i).value="");
+});
+$("btnAddChild").addEventListener("click", ()=>{
+  const obj={ id:crypto.randomUUID(), nombre:$("chNombre").value.trim(), doc:$("chDoc").value.trim(), nac:$("chNac").value, sangre:$("chSangre").value, alergias:$("chAlerg").value.trim(), school:$("chSchool").value.trim() };
+  if (!obj.nombre) return alert("Nombre del hijo/a requerido."); CHILDREN.push(obj); JSET(CHILDREN_KEY, CHILDREN); renderChildren();
+  ["chNombre","chDoc","chNac","chAlerg","chSchool"].forEach(i=> $(i).value="");
+});
+
+/* ==========================================================
+   Perfil Legal
+   ========================================================== */
+let perfil = JGET(PROFILE_KEY, {
+  madre:{}, padre:{}, tutor:{}, hijo:{},
+  custodia:{ tipo:"Compartida", guardian:"Madre", orden:"", visitas:{dias:[], ini:"", fin:"", lugar:""}, autorizaciones:{med:false, salida:false} },
+  autorizados:[], emergencias:[], firmas:{madre:"",padre:"",tutor:""}, consent:{accepted:false, timestamp:""}, createdAt:"", updatedAt:""
+});
+function savePerfil(){
+  perfil.madre={ nombre:$("m_nombre").value.trim(), doc:$("m_doc").value.trim(), tel:$("m_tel").value.trim(), mail:$("m_mail").value.trim(), dir:$("m_dir").value.trim() };
+  perfil.padre={ nombre:$("p_nombre").value.trim(), doc:$("p_doc").value.trim(), tel:$("p_tel").value.trim(), mail:$("p_mail").value.trim(), dir:$("p_dir").value.trim() };
+  perfil.tutor={ nombre:$("t_nombre").value.trim(), doc:$("t_doc").value.trim(), tel:$("t_tel").value.trim(), mail:$("t_mail").value.trim(), dir:$("t_dir").value.trim() };
+  perfil.hijo ={ nombre:$("h_nombre").value.trim(), doc:$("h_doc").value.trim(), nac:$("h_nac").value, sangre:$("h_sangre").value, alergias:$("h_alerg").value.trim(), school:$("h_school").value.trim() };
+  const diasSel = Array.from($("c_vis_dias").selectedOptions).map(o=>o.value);
+  perfil.custodia={ tipo:$("c_tipo").value, guardian:$("c_guardian").value, orden:$("c_orden").value.trim(),
+    visitas:{ dias:diasSel, ini:$("c_vis_ini").value, fin:$("c_vis_fin").value, lugar:$("c_lugar").value.trim() },
+    autorizaciones:{ med:$("c_aut_med").checked, salida:$("c_aut_salida").checked } };
+  perfil.consent={ accepted:$("consentChk").checked, timestamp: $("consentChk").checked ? (perfil.consent?.timestamp || new Date().toISOString()) : "" };
+  if (!perfil.createdAt) perfil.createdAt=new Date().toISOString(); perfil.updatedAt=new Date().toISOString();
+  JSET(PROFILE_KEY, perfil);
+  $("consentInfo").textContent = perfil.consent.accepted ? `Consentimiento otorgado el ${new Date(perfil.consent.timestamp).toLocaleString("es-CO")}` : "";
+  $("perfilMsg").innerHTML = `<div class="ok">💾 Perfil guardado.</div>`;
+}
+function loadPerfil(){
+  const set=(id,val)=>{ if ($(id)) $(id).value=val||""; };
+  set("m_nombre",perfil.madre?.nombre); set("m_doc",perfil.madre?.doc); set("m_tel",perfil.madre?.tel); set("m_mail",perfil.madre?.mail); set("m_dir",perfil.madre?.dir);
+  set("p_nombre",perfil.padre?.nombre); set("p_doc",perfil.padre?.doc); set("p_tel",perfil.padre?.tel); set("p_mail",perfil.padre?.mail); set("p_dir",perfil.padre?.dir);
+  set("t_nombre",perfil.tutor?.nombre); set("t_doc",perfil.tutor?.doc); set("t_tel",perfil.tutor?.tel); set("t_mail",perfil.tutor?.mail); set("t_dir",perfil.tutor?.dir);
+  set("h_nombre",perfil.hijo?.nombre); set("h_doc",perfil.hijo?.doc); set("h_nac",perfil.hijo?.nac); set("h_sangre",perfil.hijo?.sangre); set("h_alerg",perfil.hijo?.alergias); set("h_school",perfil.hijo?.school);
+  set("c_tipo",perfil.custodia?.tipo); set("c_guardian",perfil.custodia?.guardian); set("c_orden",perfil.custodia?.orden);
+  set("c_vis_ini",perfil.custodia?.visitas?.ini); set("c_vis_fin",perfil.custodia?.visitas?.fin); set("c_lugar",perfil.custodia?.visitas?.lugar);
+  const sel=$("c_vis_dias"); Array.from(sel.options).forEach(o=> o.selected=(perfil.custodia?.visitas?.dias||[]).includes(o.value));
+  $("c_aut_med").checked=!!perfil.custodia?.autorizaciones?.med; $("c_aut_salida").checked=!!perfil.custodia?.autorizaciones?.salida;
+  $("consentChk").checked=!!perfil.consent?.accepted; $("consentInfo").textContent = perfil.consent?.accepted ? `Consentimiento otorgado el ${new Date(perfil.consent.timestamp).toLocaleString("es-CO")}` : "";
+}
+$("btnSavePerfil").addEventListener("click", ()=>{
+  const must=[$("m_nombre").value, $("p_nombre").value, $("h_nombre").value, $("h_nac").value];
+  if (must.some(v=>!v)) return $("perfilMsg").innerHTML=`<div class="warn">Faltan datos básicos (madre, padre, menor y fecha de nacimiento).</div>`;
+  savePerfil();
+});
+$("btnPDFPerfil").addEventListener("click", ()=>{
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({unit:"pt", format:"a4"}); const M=36, W=doc.internal.pageSize.getWidth(), line=(y)=>{doc.setLineWidth(.6); doc.line(M,y,W-M,y);}, txt=(t,x,y,s=12,b=false)=>{ doc.setFontSize(s); doc.setFont(undefined,b?"bold":"normal"); doc.text(t,x,y); };
+  txt("FamilyCeleste – Ficha Legal y Familiar",M,64,18,true); txt(new Date().toLocaleString("es-CO"),M,84,10);
+  let y=110; txt("🧒 Menor",M,y,14,true); y+=16; line(y); y+=16; txt(`Nombre: ${perfil.hijo?.nombre||"-"}`,M,y); y+=16; txt(`Documento: ${perfil.hijo?.doc||"-"} • Nacimiento: ${perfil.hijo?.nac||"-"}`,M,y); y+=16; txt(`Sangre: ${perfil.hijo?.sangre||"-"} • Alergias: ${perfil.hijo?.alergias||"N/A"}`,M,y); y+=16; txt(`Colegio/Curso: ${perfil.hijo?.school||"N/A"}`,M,y);
+  y+=24; txt("👩 Madre",M,y,14,true); y+=16; line(y); y+=16; txt(`Nombre: ${perfil.madre?.nombre||"-"} • Doc: ${perfil.madre?.doc||"-"}`,M,y); y+=16; txt(`Tel: ${perfil.madre?.tel||"-"} • Correo: ${perfil.madre?.mail||"-"}`,M,y); y+=16; txt(`Dirección: ${perfil.madre?.dir||"-"}`,M,y);
+  y+=24; txt("👨 Padre",M,y,14,true); y+=16; line(y); y+=16; txt(`Nombre: ${perfil.padre?.nombre||"-"} • Doc: ${perfil.padre?.doc||"-"}`,M,y); y+=16; txt(`Tel: ${perfil.padre?.tel||"-"} • Correo: ${perfil.padre?.mail||"-"}`,M,y); y+=16; txt(`Dirección: ${perfil.padre?.dir||"-"}`,M,y);
+  y+=24; txt("👤 Tutor(a) legal",M,y,14,true); y+=16; line(y); y+=16; txt(`Nombre: ${perfil.tutor?.nombre||"N/A"} • Doc: ${perfil.tutor?.doc||"N/A"}`,M,y); y+=16; txt(`Tel: ${perfil.tutor?.tel||"N/A"} • Correo: ${perfil.tutor?.mail||"N/A"}`,M,y); y+=16; txt(`Dirección: ${perfil.tutor?.dir||"N/A"}`,M,y);
+  y+=24; txt("⚖️ Custodia",M,y,14,true); y+=16; line(y); y+=16; txt(`Tipo: ${perfil.custodia?.tipo||"-"} • Guardián: ${perfil.custodia?.guardian||"-"}`,M,y); y+=16; txt(`Orden/Proceso: ${perfil.custodia?.orden||"N/A"}`,M,y); y+=16; txt(`Visitas: ${(perfil.custodia?.visitas?.dias||[]).join(", ")||"N/A"} ${perfil.custodia?.visitas?.ini?`• ${perfil.custodia.visitas.ini}-${perfil.custodia.visitas.fin}`:""}`,M,y); y+=16; txt(`Lugar: ${perfil.custodia?.visitas?.lugar||"N/A"}`,M,y); y+=16; txt(`Aut.: Médica ${perfil.custodia?.autorizaciones?.med?"✅":"❌"} • Salida país ${perfil.custodia?.autorizaciones?.salida?"✅":"❌"}`,M,y);
+  doc.addPage(); txt("🖊️ Firmas",M,64,16,true); line(76);
+  const addSig=(t,data,x,y)=>{ txt(t,x,y,12,true); if(data){ doc.addImage(data,"PNG",x,y+10,180,80); doc.text("_________________________",x,y+100);} else { doc.text("(sin firma)",x,y+44,12);} };
+  addSig("Madre",perfil.firmas?.madre,M,96); addSig("Padre",perfil.firmas?.padre,M+200,96); addSig("Tutor(a)",perfil.firmas?.tutor,M+400,96);
+  doc.text(`Consentimiento: ${perfil.consent?.accepted?"Aceptado":"No"} ${perfil.consent?.timestamp?("• "+new Date(perfil.consent.timestamp).toLocaleString("es-CO")):""}`, M, 220);
+  doc.save("Ficha_Legal.pdf");
+});
+function makeSigPad(canvasId, clearBtnId, saveBtnId, who){
+  const cvs=$(canvasId), ctx=cvs.getContext("2d");
+  function fit(){ cvs.width=cvs.clientWidth; cvs.height=120; ctx.lineWidth=2; ctx.lineJoin="round"; ctx.lineCap="round"; }
+  fit(); window.addEventListener("resize", fit);
+  let drawing=false; const getXY=e=>{ const r=cvs.getBoundingClientRect(); if (e.touches&&e.touches[0]) return {x:e.touches[0].clientX-r.left,y:e.touches[0].clientY-r.top}; return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+  const start=e=>{ drawing=true; const {x,y}=getXY(e); ctx.beginPath(); ctx.moveTo(x,y); }; const move=e=>{ if(!drawing)return; const {x,y}=getXY(e); ctx.lineTo(x,y); ctx.stroke(); }; const end=()=>drawing=false;
+  cvs.addEventListener("mousedown",start); cvs.addEventListener("mousemove",move); window.addEventListener("mouseup",end);
+  cvs.addEventListener("touchstart",(e)=>{e.preventDefault();start(e);},{passive:false}); cvs.addEventListener("touchmove",(e)=>{e.preventDefault();move(e);},{passive:false}); cvs.addEventListener("touchend",end);
+  $(clearBtnId).addEventListener("click", ()=> ctx.clearRect(0,0,cvs.width,cvs.height));
+  $(saveBtnId).addEventListener("click", ()=>{ const data=cvs.toDataURL("image/png"); perfil.firmas[who]=data; perfil.updatedAt=new Date().toISOString(); JSET(PROFILE_KEY, perfil); $("perfilMsg").innerHTML=`<div class="ok">🖊️ Firma de ${who} guardada.</div>`; });
+}
+makeSigPad("sigMadre","sigMadreClear","sigMadreSave","madre");
+makeSigPad("sigPadre","sigPadreClear","sigPadreSave","padre");
+makeSigPad("sigTutor","sigTutorClear","sigTutorSave","tutor");
+loadPerfil();
+
+/* ==========================================================
+   Incidencias
+   ========================================================== */
+let INC = JGET(INC_KEY, []);
+function renderInc(){
+  $("incList").innerHTML = INC.length ? INC.slice().reverse().map(i=>`
+    <div class="row" style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; border:1px dashed var(--border); padding:8px; border-radius:10px; margin-bottom:6px;">
+      <div><strong>${i.tipo}</strong> <span class="small">• ${new Date(i.fecha).toLocaleString("es-CO")} ${i.delay?`• Retraso ${i.delay} min`:""}</span> ${i.notas?`<div class="small">${i.notas}</div>`:""}</div>
+      <button class="btn-outline" onclick="delInc('${i.id}')">Eliminar</button>
+    </div>
+  `).join("") : `<div class="small">Sin incidencias.</div>`;
+}
+window.delInc=(id)=>{ INC=INC.filter(x=>x.id!==id); JSET(INC_KEY, INC); renderInc(); };
+$("btnIncAdd").addEventListener("click", ()=>{
+  const tipo=$("incTipo").value, fecha=$("incFecha").value||new Date().toISOString(), delay=parseInt($("incDelay").value||"0")||0, notas=($("incNotas").value||"").trim();
+  const rec={ id:crypto.randomUUID(), tipo, fecha, delay, notas }; INC.push(rec); JSET(INC_KEY, INC); renderInc(); $("incNotas").value=""; $("incDelay").value="0";
+});
+$("btnIncPDF").addEventListener("click", ()=>{
+  const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:"pt",format:"a4"}); const M=36,W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(); const line=y=>{doc.setLineWidth(.6);doc.line(M,y,W-M,y);}, txt=(t,x,y,s=12,b=false)=>{doc.setFontSize(s); doc.setFont(undefined,b?"bold":"normal"); doc.text(t,x,y);};
+  txt("Informe de Incidencias de Custodia",M,60,18,true); txt(new Date().toLocaleString("es-CO"),M,78,10);
+  let y=100; if(!INC.length){ doc.text("Sin registros.",M,y); return doc.save("Incidencias_Custodia.pdf"); }
+  INC.sort((a,b)=> new Date(a.fecha)-new Date(b.fecha)).forEach(i=>{ if(y>H-60){doc.addPage(); y=M;} txt(`• ${i.tipo} — ${new Date(i.fecha).toLocaleString("es-CO")} ${i.delay?`• ${i.delay} min`:""}`,M,y); y+=16; if(i.notas){ txt(`   Notas: ${i.notas}`,M,y); y+=16; } });
+  doc.save("Incidencias_Custodia.pdf");
+});
+
+/* ==========================================================
+   Borrar todo (local) Gastos
+   ========================================================== */
+$("btnMovsDeleteAll")?.addEventListener("click", ()=>{
+  if (!movimientos.length) return alert("No hay gastos.");
+  if (!confirm("¿Borrar TODOS los gastos localmente?")) return;
+  movimientos = []; guardarMovs(); recomputeGastosFromMovs(); actualizarTabla(); renderMovs(); actualizarGrafico(); actualizarResumen(); refreshToday();
+});
+
+/* ==========================================================
+   Botones portada y PIN
+   ========================================================== */
+$("btnLogin").addEventListener("click", ()=> alert("Modo local activo."));
+$("btnVincular").addEventListener("click", ()=>{
+  const code=prompt("Ingresa o comparte tu código de familia:", $("familyCode").value||""); if(code){ $("familyCode").value=code; LS(FAMILY_KEY, code); FAMILY_CODE=code; alert("Código establecido."); }
+});
+$("btnRegistrar").addEventListener("click", ()=> $("perfilLegalCard").scrollIntoView({behavior:"smooth"}));
+(function pinInit(){
+  const modal=$("pinModal"); const saved=LS(PIN_KEY); const show=()=> modal.style.display="flex"; const hide=()=> modal.style.display="none";
+  if (saved){ show(); $("pinOk").onclick=()=>{ const val=($("pinInput").value||"").trim(); if (val && val===saved){ hide(); } else alert("PIN incorrecto"); }; }
+  $("pinSet").onclick=()=>{ const v=($("pinNew").value||"").trim(); if(!/^\d{4,6}$/.test(v)) return alert("El PIN debe tener 4 a 6 dígitos."); LS(PIN_KEY,v); alert("PIN guardado."); };
+})();
+
+/* ==========================================================
+   Inicialización
+   ========================================================== */
+function init(){
+  renderFilesGrid(); // comprobantes
+  actualizarTabla(); actualizarGrafico(); actualizarResumen(); renderMovs(); renderDocs(); renderGrowth(); renderMembers(); renderChildren(); renderInc();
+  renderAgendaUI(); refreshToday(); mkRender(); cpRender(); renderMaintTable(); applyAnnualIPCIfNeeded();
+  if ($("ipcDate") && !$("ipcDate").value){ const y=new Date().getFullYear(); $("ipcDate").value = `${y}-01-15`; }
+  if ($("maintFrom") && !$("maintFrom").value){ const d=new Date(); $("maintFrom").value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
+}
+init();
+</script>
+
+
+<script id="fc-i18n-anylang">
+(function(){
+  const rtlLangs = new Set(['ar','ur','fa','he']);
+  const countryToCurrency = {'CO':'COP','MX':'MXN','AR':'ARS','CL':'CLP','PE':'PEN','US':'USD','GB':'GBP','BR':'BRL','PT':'EUR','FR':'EUR','RU':'RUB','CN':'CNY','IN':'INR','SA':'SAR','EG':'EGP','BD':'BDT','PK':'PKR'};
+  // Config de MT (traducción automática). Usará diccionario si falla.
+  const MT = { enabled: true, endpoint: 'https://translate.astian.org/translate', apiKey: null, batch: false };
+
+  // Diccionario base (rápido) para claves comunes (ES -> otros). Se amplía dinámicamente con cache MT.
+  const T = JSON.parse(localStorage.getItem('fc_dict_cache')||'{}');
+
+  function setDir(lang){ document.documentElement.classList.toggle('fc-rtl', rtlLangs.has(lang)); document.documentElement.setAttribute('dir', rtlLangs.has(lang)?'rtl':'ltr'); }
+
+  function uniqueTexts(){
+    const walker=document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode:n=>{ const s=(n.nodeValue||'').trim(); if(!s) return NodeFilter.FILTER_REJECT; if(/\S/.test(s)===false) return NodeFilter.FILTER_REJECT; if(s.length<2) return NodeFilter.FILTER_REJECT; return NodeFilter.FILTER_ACCEPT; } });
+    const nodes=[], set=new Set();
+    while(walker.nextNode()){
+      const node=walker.currentNode; const key=node.nodeValue.trim();
+      nodes.push(node); set.add(key);
+    }
+    return {nodes, list:[...set]};
+  }
+
+  async function mtTranslate(q, target){
+    try{
+      const cacheKey = `mt_${target}_${q}`; const cached = localStorage.getItem(cacheKey); if(cached) return cached;
+      if(!MT.enabled) return null;
+      const res = await fetch(MT.endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ q, source:'auto', target, format:'text', api_key: MT.apiKey }) });
+      if(!res.ok) return null; const data = await res.json(); const out = data.translatedText || null; if(out) localStorage.setItem(cacheKey, out); return out;
+    }catch(e){ return null }
+  }
+
+  async function translateAll(lang){
+    setDir(lang);
+    const {nodes, list} = uniqueTexts();
+    // Construir mapa de traducciones
+    const map = {};
+    for(const s of list){
+      // 1) Si ya existe en cache local de diccionario
+      const k = `k:${lang}:${s}`; if(T[k]){ map[s]=T[k]; continue; }
+      // 2) Intentar MT
+      const mt = await mtTranslate(s, lang);
+      if(mt){ map[s]=mt; T[k]=mt; continue; }
+      // 3) Si no hay MT, mantener original (no rompemos la interfaz)
+      map[s]=s;
+    }
+    // Guardar caché de diccionario ampliado
+    localStorage.setItem('fc_dict_cache', JSON.stringify(T));
+    // Aplicar al DOM (solo nodos cuyo texto coincide exactamente)
+    nodes.forEach(n=>{ const src=n.nodeValue.trim(); if(map[src] && map[src]!==src){ n.nodeValue = n.nodeValue.replace(src, map[src]); }});
+  }
+
+  // Moneda por país
+  function applyCurrencyByCountry(code){
+    const tokens=Object.values(countryToCurrency).filter((v,i,a)=>a.indexOf(v)===i);
+    const tokenRe=new RegExp('\(' + tokens.concat(['COP','USD','EUR','MXN','ARS','CLP','PEN','BRL','GBP','RUB','CNY','INR','SAR','EGP','BDT','PKR']).join('|') + ')\','g');
+    const walker=document.createTreeWalker(document.getElementById('fc-container')||document.body, NodeFilter.SHOW_TEXT, null);
+    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(n=>{const s=n.nodeValue; if(!s||!tokenRe.test(s)) return; n.nodeValue=s.replace(tokenRe, code)});
+    window.fcCurrency = code; localStorage.setItem('fc_currency', code);
+    const fmt=(n)=>{ try{return new Intl.NumberFormat(undefined,{style:'currency',currency:code,maximumFractionDigits:0}).format(n)}catch(e){return code+' '+(Math.round(n)||0)} };
+    const toN=(t)=>{ if(!t) return NaN; const c=(''+t).replace(/[^0-9,\.]/g,'').replace(/(,)(?=\d{3}(\D|$))/g,'').replace(/,/g,'.'); return parseFloat(c) };
+    [['#fc-wish-table','tbody tr td:nth-child(5)'], ['#fc-need-table','tbody tr td:nth-child(5)']].forEach(([table,sel])=>{
+      document.querySelectorAll(table+' '+sel).forEach(td=>{const x=toN(td.textContent); if(!isNaN(x)) td.textContent = fmt(x)});
+    });
+  }
+
+  // Wiring manual (inputs ISO) y selectores si están presentes
+  function setupI18N(){
+    const cSel=document.getElementById('fc-country');
+    const lSel=document.getElementById('fc-language');
+    if(cSel){
+      cSel.addEventListener('change', async (e)=>{
+        const c=e.target.value.trim().toUpperCase(); localStorage.setItem('fc_country', c);
+        const cur = countryToCurrency[c] || 'USD'; applyCurrencyByCountry(cur);
+      });
+      const savedC=localStorage.getItem('fc_country'); if(savedC){ cSel.value=savedC; const cur=countryToCurrency[savedC]||'USD'; applyCurrencyByCountry(cur); }
+    }
+    if(lSel){
+      lSel.addEventListener('change', async (e)=>{ const lang=e.target.value.trim().toLowerCase(); localStorage.setItem('fc_lang', lang); await translateAll(lang); });
+      const savedL=localStorage.getItem('fc_lang'); if(savedL){ lSel.value=savedL; translateAll(savedL); }
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', setupI18N); else setupI18N();
+})();
+</script>
+
+</body>
+</html>
