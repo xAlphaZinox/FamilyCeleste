@@ -2258,6 +2258,48 @@ init();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', setupI18N); else setupI18N();
 })();
 </script>
+<script>
+(function () {
+  // Lee ?view=xxxx (ej.: view=manutencion, agenda, perfil, etc.)
+  const view = new URLSearchParams(location.search).get('view');
+  if (!view) return;
 
+  // Mapa: view -> IDs de secciones que deben quedar visibles
+  const MAP = {
+    intro: ['sec_intro'],
+    manutencion: ['sec_manutencion'],
+    resumen: ['sec_resumen'],
+    gastos: ['sec_gasto','sec_tabla','sec_grafico'],
+    comprobantes: ['sec_comprobantes'],
+    documentos: ['sec_docs'],
+    agenda: ['sec_agenda'],
+    chat: ['sec_chat'],
+    mercado: ['sec_mercado'],
+    cupones: ['sec_cupones'],
+    crecimiento: ['sec_crecimiento'],
+    miembros: ['sec_miembros'],
+    perfil: ['perfilLegalCard'],
+    incidencias: ['sec_incidencias']
+  };
+
+  const show = new Set(MAP[view] || []);
+  // Lista de bloques principales en tu HTML (ajústala si añadiste/quitaste alguno)
+  const ALL = [
+    'sec_intro','sec_manutencion','sec_resumen','sec_quick','sec_gasto','sec_tabla',
+    'sec_grafico','sec_comprobantes','sec_docs','sec_agenda','sec_chat','sec_mercado',
+    'sec_cupones','sec_crecimiento','sec_miembros','perfilLegalCard','sec_incidencias'
+  ];
+
+  ALL.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = show.size ? (show.has(id) ? '' : 'none') : '';
+  });
+
+  // Enfoca la primera sección visible
+  const first = show.size ? document.getElementById([...show][0]) : null;
+  if (first) first.scrollIntoView({behavior:'instant', block:'start'});
+})();
+</script>
 </body>
 </html>
